@@ -329,7 +329,7 @@ class GroceryProductsBySubcategoryVendorView(generics.ListAPIView):
         if not vendor_id or not sub_category_id:
             return GroceryProducts.objects.none()
 
-        return GroceryProducts.objects.filter(vendor_id=vendor_id, sub_category_id=sub_category_id)
+        return GroceryProducts.objects.filter(vendor_id=vendor_id, subcategory_id=sub_category_id)
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
