@@ -52,11 +52,13 @@ class VerifyOTPSerializer(serializers.Serializer):
 
 
 class AddressSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.name',read_only=True)
+    email = serializers.CharField(source='user.email',read_only=True)
     class Meta:
         model = Address
         fields = [
-            'id', 'address_line1', 'address_line2', 'city', 'state',
-            'country', 'pincode', 'contact_number', 'is_primary',
+            'id', 'username','email','address_line1', 'address_line2', 'city', 'state',
+            'country', 'pincode', 'contact_number', 'is_primary','address_name'
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
