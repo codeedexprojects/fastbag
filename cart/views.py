@@ -632,6 +632,34 @@ class VendorOrderListView(APIView):
             })
 
         return Response(order_data)
+    
+class VendorOrderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [VendorJWTAuthentication]
+
+    def get(self, request, order_id):
+        vendor = request.user
+        order = get_object_or_404(Order, order_id=order_id, checkout__items__vendor=vendor)
+        vendor_items = order.checkout.items.filter(vendor=vendor)
+
+        data = {
+            "order_id": order.order_id,
+            "user_name": order.user.name,
+            "total_amount": order.total_amount,
+            "final_amount": order.final_amount,
+            "used_coupon": order.used_coupon,
+            "payment_method": order.payment_method,
+            "payment_status": order.payment_status,
+            "order_status": order.order_status,
+            "shipping_address": order.shipping_address,
+            "contact_number": order.contact_number,
+            "created_at": order.created_at,
+            "updated_at": order.updated_at,
+            "products": CheckoutItemSerializer(vendor_items, many=True).data
+        }
+
+        return Response(data)
+
 
 from collections import defaultdict
 from decimal import Decimal

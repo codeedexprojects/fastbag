@@ -4,6 +4,7 @@ from django.contrib.auth.hashers import make_password
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from rest_framework.permissions import BasePermission
+from django.utils import timezone
 
 
 #Admin
@@ -56,6 +57,8 @@ class  Vendor(models.Model):
     is_favourite = models.BooleanField(default=False)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  
+    is_closed = models.BooleanField(default=False) 
+
     def __str__(self):
         return self.business_name
 
@@ -103,6 +106,26 @@ class  Vendor(models.Model):
     def is_fully_active(self):
         return self.is_active and self.is_approved
     
+    def save(self, *args, **kwargs):
+        if not self.store_id:
+            self.store_id = 'STR' + str(uuid.uuid4().hex[:4].upper())
+
+        if self.closing_time:
+            now = timezone.localtime().time()
+            if now > self.closing_time:
+                self.is_closed = True
+
+        super().save(*args, **kwargs)
+
+    @property
+    def is_closed_now(self):
+        now = timezone.localtime().time()
+        if self.opening_time and self.closing_time:
+            return not (self.opening_time <= now <= self.closing_time)
+        elif self.closing_time:
+            return now > self.closing_time
+        return False
+        
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True) 
     store_type = models.ForeignKey(StoreType,on_delete=models.SET_NULL, null=True, blank=True)

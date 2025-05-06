@@ -136,7 +136,7 @@ class ProductsBySubcategoryView(APIView):
             paginator = self.pagination_class()
 
             if subcategory_type == 'Grocery':
-                products = GroceryProducts.objects.filter(sub_category_id=subcategory_id, is_available=True)
+                products = GroceryProducts.objects.filter(subcategory_id=subcategory_id, is_available=True)
                 result_page = paginator.paginate_queryset(products, request)
                 serializer = GroceryProductSerializer(result_page, many=True, context={'request': request})  
                 return paginator.get_paginated_response(serializer.data)

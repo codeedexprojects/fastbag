@@ -24,7 +24,7 @@ class VendorCreateSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed'
         ]
         
 
@@ -53,7 +53,7 @@ class VendorNameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Vendor
-        fields = ['business_name', 'opening_time', 'closing_time','is_favourite']
+        fields = ['business_name', 'opening_time', 'closing_time','is_favourite','is_closed']
 
     def get_opening_time(self, obj):
         return obj.get_opening_time_str()  
@@ -74,7 +74,7 @@ class VendorDetailSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed'
         ]
 
     def get_fssai_certificate(self, obj):
@@ -113,6 +113,9 @@ class VendorDetailSerializer(serializers.ModelSerializer):
         instance.is_pending_update_approval = True
         instance.save()
         return instance
+    
+    def get_is_closed_now(self, obj):
+        return obj.is_closed_now
 
 class VendorfavSerializer(serializers.ModelSerializer):
     opening_time = serializers.SerializerMethodField()
@@ -139,7 +142,7 @@ class VendorPendingDetailSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor
-        fields = ['id','business_name','opening_time','display_image']
+        fields = ['id','business_name','opening_time','display_image','is_closed']
 
 class VendorHomePageSerializer(serializers.ModelSerializer):
     is_favourite = serializers.SerializerMethodField()
@@ -147,7 +150,7 @@ class VendorHomePageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Vendor
-        fields = ['id', 'business_name', 'opening_time','closing_time','display_image', 'is_favourite','store_type','store_logo','business_location']
+        fields = ['id', 'business_name', 'opening_time','closing_time','display_image', 'is_favourite','store_type','store_logo','business_location','is_closed']
 
     def get_is_favourite(self, obj):
         request = self.context.get('request')

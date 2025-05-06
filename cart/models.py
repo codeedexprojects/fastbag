@@ -84,7 +84,7 @@ class Checkout(models.Model):
     order_status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='pending')
 
     shipping_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="shipping_address", null=True, blank=True)
-    contact_number = models.CharField(max_length=15)
+    contact_number = models.CharField(max_length=15,null=True,blank=True)
 
     coupon = models.ForeignKey('users.Coupon', on_delete=models.SET_NULL, null=True, blank=True, related_name='checkouts_used')
     coupon_code = models.CharField(max_length=50, blank=True, null=True)  # Stored for backup or reporting

@@ -22,11 +22,13 @@ urlpatterns = [
     path('order-list-admin/', AllorderviewAdmin.as_view(), name='0rder-list-admin'), #list all orders
     #orders by vendors
     path('vendor/orders/', VendorOrderListView.as_view(), name='vendor-orders'),
+    path('vendor/orders/<str:order_id>/', VendorOrderDetailView.as_view(), name='vendor-order-detail'),#vendor order detail
     # cart group
     path('cart/grouped/', GroupedCartView.as_view(), name='grouped-cart'),
     #single vendor cart
     path('cart/vendor/<int:vendor_id>/', VendorCartItemsView.as_view(), name='vendor-cart-items'),
     path('checkout/<int:pk>/', VendorCheckoutView.as_view(), name='vendor-checkout'), #check out
+    
 ]
 
 

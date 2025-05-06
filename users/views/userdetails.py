@@ -126,6 +126,7 @@ class LoginView(APIView):
                             "mobile_number": user.mobile_number,
                             "name": user.name,
                             "is_verified": user.is_verified,
+                            "user_id": user.id
                         },
                         "access_token": access_token,
                         # "refresh_token": str(refresh),

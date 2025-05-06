@@ -51,20 +51,22 @@ class DishImageSerializer(serializers.ModelSerializer):
         return obj.image.url
 
 class DishCreateSerializer(serializers.ModelSerializer):
-    vendor_name = serializers.CharField(source='vendor.business_name',read_only=True)
-    category_name = serializers.CharField(source='category.name',read_only=True)
-    subcategory_name = serializers.CharField(source='subcategory.name',read_only=True)
-    image_files  = serializers.ListField(
-        child=serializers.ImageField(), write_only=True
+    vendor_name = serializers.CharField(source='vendor.business_name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
+    image_files = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False
     )
-    images = serializers.SerializerMethodField()  # now readable
-    store_type = serializers.CharField(source='vendor.store_type.name',read_only=True)
+    images = serializers.SerializerMethodField()
+    store_type = serializers.CharField(source='vendor.store_type.name', read_only=True)
 
     class Meta:
         model = Dish
-        fields = ['id','vendor','vendor_name','category','category_name','subcategory','subcategory_name', 'name', 'description', 'price','wholesale_price',
-                  'offer_price', 'variants','discount', 'is_available', 'images','image_files', 'is_popular_product',
-                  'is_offer_product', 'is_available','store_type']
+        fields = ['id', 'vendor', 'vendor_name', 'category', 'category_name',
+                  'subcategory', 'subcategory_name', 'name', 'description', 'price',
+                  'wholesale_price', 'offer_price', 'variants', 'discount',
+                  'is_available', 'images', 'image_files', 'is_popular_product',
+                  'is_offer_product', 'is_available', 'store_type']
 
     def create(self, validated_data):
         image_files = validated_data.pop('image_files', [])
@@ -73,10 +75,25 @@ class DishCreateSerializer(serializers.ModelSerializer):
             DishImage.objects.create(dish=dish, image=image)
         return dish
 
+    def update(self, instance, validated_data):
+        image_files = validated_data.pop('image_files', [])
+        # Update other dish fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Optionally delete old images before adding new ones
+        if image_files:
+            instance.images.all().delete()
+            for image in image_files:
+                DishImage.objects.create(dish=instance, image=image)
+
+        return instance
 
     def get_images(self, obj):
         request = self.context.get('request')
         return DishImageSerializer(obj.images.all(), many=True, context={'request': request}).data
+
     
 class Dishlistserializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source='vendor.business_name',read_only=True)
