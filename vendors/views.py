@@ -441,22 +441,19 @@ class ForgotEmailVerifyOTPView(APIView):
         except Vendor.DoesNotExist:
             return Response({"error": "Vendor with this alternate email not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Validate OTP
+
         if vendor.otp != otp or now() > vendor.otp_expiry:
             return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # OTP is valid, reset OTP fields
         vendor.otp = None
         vendor.otp_expiry = None
         vendor.save()
 
-        # Authenticate vendor using email
-        user = authenticate(request, username=vendor.email)  # Username is treated as email here
+        user = authenticate(request, username=vendor.email)  
 
         if not user:
             return Response({"error": "Authentication failed."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
         return Response({
@@ -478,18 +475,24 @@ class CategoryView(viewsets.ModelViewSet):
 
 from django_filters.rest_framework import DjangoFilterBackend
 class CategoryListView(generics.ListAPIView):
-    permission_classes=[AllowAny]
+    permission_classes = [AllowAny]
     serializer_class = CategorySerializer
     filter_backends = [DjangoFilterBackend]
     pagination_class = None
+
     def get_queryset(self):
         queryset = Category.objects.all()
-        store_type_name = self.request.query_params.get('store_type_name', None)
-        
+        store_type_name = self.request.query_params.get('store_type_name')
+        name = self.request.query_params.get('name')
+
         if store_type_name:
-            queryset = queryset.filter(store_type__name__iexact=store_type_name)  
+            queryset = queryset.filter(store_type__name__iexact=store_type_name)
         
+        if name:
+            queryset = queryset.filter(name__icontains=name)  # partial match, case-insensitive
+
         return queryset
+
     
 class ApproveVendorUpdateView(APIView):
     def post(self, request, pk, *args, **kwargs):
