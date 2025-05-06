@@ -734,144 +734,254 @@ class VendorCheckoutView(APIView):
         user = request.user
         data = request.data
 
+        # Validate required fields
         shipping_address_id = data.get('shipping_address_id')
         contact_number = data.get('contact_number')
-        payment_method = data.get('payment_method', 'cod')  # Default to 'cod'
-        coupon_code = data.get('coupon_code')  # Optional
+        payment_method = data.get('payment_method', 'cod')
+        coupon_code = data.get('coupon_code')
 
-        if not shipping_address_id or not contact_number:
-            return Response({'error': 'Shipping address and contact number are required.'}, status=400)
-
-        # Validate shipping address
-        try:
-            address = Address.objects.get(id=shipping_address_id, user=user)
-        except Address.DoesNotExist:
-            return Response({'error': 'Invalid shipping address.'}, status=400)
-
-        # Get cart and vendor-specific cart items
-        try:
-            cart = Cart.objects.get(user=user)
-            cart_items = cart.items.filter(vendor_id=vendor_id)
-        except Cart.DoesNotExist:
-            return Response({'error': 'Cart not found.'}, status=404)
-
-        if not cart_items.exists():
-            return Response({'error': 'No items in cart for this vendor.'}, status=400)
-
-        # Calculate total
-        total_amount = sum(item.price * item.quantity for item in cart_items)
-
-        coupon = None
-        coupon_discount = Decimal('0.00')
-
-        # Apply coupon if provided
-        if coupon_code:
-            coupon_result = self.validate_and_apply_coupon(coupon_code, total_amount, user, vendor_id)
-            if 'error' in coupon_result:
-                return Response({'error': coupon_result['error']}, status=400)
-            coupon = coupon_result['coupon']
-            coupon_discount = coupon_result['discount']
-
-        final_amount = total_amount - coupon_discount
-        final_amount = max(final_amount, Decimal('0.00'))
-
-        with transaction.atomic():
-            # Generate unique order ID
-            order_id = f"ORD-{timezone.now().strftime('%Y%m%d%H%M%S')}-{user.id}"
-
-            # Generate random 6-digit delivery pin
-            delivery_pin = str(random.randint(100000, 999999))
-
-            # Prepare product details list
-            product_details = []
-            for item in cart_items:
-                detail = {
-                    "product_id": item.product_id,
-                    "variant": item.variant,
-                    "weight": item.weight if hasattr(item, 'weight') else None,
-                    "quantity": item.quantity
-                }
-                product_details.append(detail)
-
-            # Create checkout
-            checkout = Checkout.objects.create(
-                user=user,
-                order_id=order_id,
-                total_amount=total_amount,
-                discount_amount=coupon_discount,
-                final_amount=final_amount,
-                payment_method=payment_method,
-                contact_number=contact_number,
-                shipping_address=address,
-                coupon=coupon,
-                coupon_code=coupon_code if coupon else None,
-                coupon_discount=coupon_discount
+        if not shipping_address_id:
+            return Response(
+                {'error': 'Shipping address is required.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-            # Create checkout items
-            for item in cart_items:
-                CheckoutItem.objects.create(
-                    checkout=checkout,
-                    vendor=item.vendor,
-                    product_type=item.product_type,
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    color=item.color,
-                    size=item.size,
-                    variant=item.variant,
-                    price=item.price,
-                    subtotal=item.price * item.quantity,
+        try:
+            # Start atomic transaction
+            with transaction.atomic():
+                # Lock relevant database rows
+                address = Address.objects.select_for_update().get(
+                    id=shipping_address_id,
+                    user=user
                 )
+                vendor = Vendor.objects.select_for_update().get(id=vendor_id)
+                cart = Cart.objects.select_for_update().get(user=user)
+                cart_items = cart.items.filter(vendor=vendor).select_related('vendor')
 
-            # Create order
-            order = Order.objects.create(
-                user=user,
-                checkout=checkout,
-                order_id=order_id,
-                total_amount=total_amount,
-                final_amount=final_amount,
-                payment_method=payment_method,
-                order_status='pending',
-                shipping_address=address,
-                contact_number=contact_number,
-                used_coupon=checkout.coupon_code,
-                delivery_pin=delivery_pin,
-                product_details=product_details
-            )
+                if not cart_items.exists():
+                    return Response(
+                        {'error': 'No items in cart for this vendor.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            # Track coupon usage
-            if coupon:
-                UserCouponUsage.objects.create(
-                    coupon=coupon,
+                # Calculate total
+                total_amount = sum(item.price * item.quantity for item in cart_items)
+                coupon = None
+                coupon_discount = Decimal('0.00')
+
+                # Apply coupon if provided
+                if coupon_code:
+                    coupon_result = self.validate_and_apply_coupon(
+                        coupon_code, total_amount, user, vendor_id
+                    )
+                    if 'error' in coupon_result:
+                        return Response(
+                            {'error': coupon_result['error']},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    coupon = coupon_result['coupon']
+                    coupon_discount = coupon_result['discount']
+
+                final_amount = total_amount - coupon_discount
+                final_amount = max(final_amount, Decimal('0.00'))
+
+                # Generate order details
+                order_id = f"ORD-{timezone.now().strftime('%Y%m%d%H%M%S')}-{user.id}"
+                delivery_pin = str(random.randint(100000, 999999))
+
+                # Create checkout record
+                checkout = Checkout.objects.create(
                     user=user,
-                    checkout=checkout
+                    order_id=order_id,
+                    total_amount=total_amount,
+                    discount_amount=coupon_discount,
+                    final_amount=final_amount,
+                    payment_method=payment_method,
+                    contact_number=contact_number or '',
+                    shipping_address=address,
+                    coupon=coupon,
+                    coupon_code=coupon_code if coupon else None,
+                    coupon_discount=coupon_discount
                 )
 
-            # Clear cart items only for this vendor
-            cart_items.delete()
+                # Process each cart item
+                product_details = []
+                for item in cart_items:
+                    # Create checkout item
+                    CheckoutItem.objects.create(
+                        checkout=checkout,
+                        vendor=item.vendor,
+                        product_type=item.product_type,
+                        product_id=item.product_id,
+                        quantity=item.quantity,
+                        color=item.color,
+                        size=item.size,
+                        variant=item.variant,
+                        price=item.price,
+                        subtotal=item.price * item.quantity,
+                    )
 
-        # Prepare final response
-        response_data = {
-            "message": "Checkout successful, order created.",
-            "order_id": order.order_id,
-            "final_amount": float(order.final_amount),
-            "payment_method": order.payment_method,
-            "order_status": order.order_status,
-            "delivery_pin": order.delivery_pin
-        }
+                    # Record product details
+                    product_details.append({
+                        "product_id": item.product_id,
+                        "variant": item.variant,
+                        "quantity": item.quantity,
+                        "color": item.color,
+                        "size": item.size
+                    })
 
-        if coupon:
-            response_data.update({
-                "coupon_applied": coupon.code,
-                "discount_amount": float(coupon_discount)
-            })
+                    # Reduce stock
+                    try:
+                        if item.product_type == 'grocery':
+                            self.handle_grocery_stock_reduction(item)
+                        elif item.product_type == 'clothing':
+                            self.handle_clothing_stock_reduction(item)
+                    except Exception as e:
+                        return Response(
+                            {'error': str(e)},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-        return Response(response_data, status=201)
+                # Create order
+                order = Order.objects.create(
+                    user=user,
+                    checkout=checkout,
+                    order_id=order_id,
+                    total_amount=total_amount,
+                    final_amount=final_amount,
+                    payment_method=payment_method,
+                    order_status='pending',
+                    shipping_address=address,
+                    contact_number=contact_number,
+                    used_coupon=checkout.coupon_code,
+                    delivery_pin=delivery_pin,
+                    product_details=product_details
+                )
+
+                # Track coupon usage
+                if coupon:
+                    UserCouponUsage.objects.create(
+                        coupon=coupon,
+                        user=user,
+                        checkout=checkout
+                    )
+
+                # Clear cart items
+                cart_items.delete()
+
+                # Handle payment
+                if payment_method == 'online':
+                    try:
+                        client = razorpay.Client(
+                            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+                        )
+                        razorpay_order = client.order.create({
+                            "amount": int(final_amount * 100),
+                            "currency": "INR",
+                            "payment_capture": "1"
+                        })
+                        checkout.razorpay_order_id = razorpay_order['id']
+                        checkout.save()
+                    except Exception as e:
+                        return Response(
+                            {'error': f'Payment error: {str(e)}'},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE
+                        )
+
+                return Response({
+                    "order_id": order.order_id,
+                    "final_amount": float(final_amount),
+                    "payment_status": "pending",
+                    "delivery_pin": delivery_pin
+                }, status=status.HTTP_201_CREATED)
+
+        except (Vendor.DoesNotExist, Address.DoesNotExist, Cart.DoesNotExist) as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Checkout failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def handle_grocery_stock_reduction(self, item):
+        """Atomic stock reduction for grocery items"""
+        product = GroceryProducts.objects.select_for_update().get(id=item.product_id)
+
+        if isinstance(product.weights, list):
+            # Create new list to force JSON field update
+            new_weights = []
+            found = False
+            for weight in product.weights:
+                if weight['weight'] == item.variant:
+                    if weight['quantity'] < item.quantity:
+                        raise ValueError(f"Insufficient stock for {item.variant}")
+                    new_weight = weight.copy()
+                    new_weight['quantity'] = F('quantity') - item.quantity
+                    new_weight['is_in_stock'] = new_weight['quantity'] > 0
+                    found = True
+                new_weights.append(new_weight)
+
+            if not found:
+                raise ValueError(f"Variant {item.variant} not found")
+
+            # Update using bulk_update for better performance
+            GroceryProducts.objects.filter(id=product.id).update(weights=new_weights)
+
+        elif isinstance(product.weights, dict):
+            variant_data = product.weights.get(item.variant)
+            if not variant_data or variant_data['quantity'] < item.quantity:
+                raise ValueError(f"Insufficient stock for {item.variant}")
+
+            # Use F expression for atomic update
+            GroceryProducts.objects.filter(id=product.id).update(
+                weights={
+                    **product.weights,
+                    item.variant: {
+                        'quantity': F(f'weights__{item.variant}__quantity') - item.quantity,
+                        'is_in_stock': F(f'weights__{item.variant}__quantity') - item.quantity > 0,
+                        'price': variant_data['price']
+                    }
+                }
+            )
+
+        else:
+            raise ValueError("Invalid weight format")
+
+    def handle_clothing_stock_reduction(self, item):
+        """Atomic stock reduction for clothing items"""
+        # Update relational data
+        updated = ClothingSize.objects.filter(
+            color__clothing_id=item.product_id,
+            color__color_name=item.color,
+            size=item.size
+        ).update(stock=F('stock') - item.quantity)
+
+        if updated == 0:
+            raise ValueError("Size/color combination not found")
+
+        # Verify stock didn't go negative
+        size = ClothingSize.objects.get(
+            color__clothing_id=item.product_id,
+            color__color_name=item.color,
+            size=item.size
+        )
+        if size.stock < 0:
+            raise ValueError("Insufficient stock after reduction")
+
+        # Update JSON representation
+        clothing = Clothing.objects.get(id=item.product_id)
+        for color in clothing.colors:
+            if color['color_name'] == item.color:
+                for size in color.get('sizes', []):
+                    if size['size'] == item.size:
+                        size['stock'] = size.stock  # From relational model
+        clothing.save(update_fields=['colors'])
 
     def validate_and_apply_coupon(self, coupon_code, total_amount, user, vendor_id):
-        """
-        Validate coupon and calculate discount.
-        """
+        """Validate and calculate coupon discount"""
         now = timezone.now()
 
         try:
@@ -884,29 +994,29 @@ class VendorCheckoutView(APIView):
         except Coupon.DoesNotExist:
             return {'error': 'Invalid or expired coupon code.'}
 
-        # Check vendor match
+        # Vendor validation
         if coupon.vendor and coupon.vendor.id != int(vendor_id):
-            return {'error': 'This coupon cannot be used with this vendor.'}
+            return {'error': 'This coupon is not valid for this vendor.'}
 
-        # Minimum order amount check
+        # Minimum order amount
         if coupon.min_order_amount and total_amount < coupon.min_order_amount:
-            return {'error': f'Minimum order amount of {coupon.min_order_amount} required for this coupon.'}
+            return {'error': f'Minimum order amount of {coupon.min_order_amount} required.'}
 
-        # One-time usage check
-        if coupon.usage_limit == 1:
-            if UserCouponUsage.objects.filter(coupon=coupon, user=user).exists():
-                return {'error': 'You have already used this coupon.'}
+        # Usage limits
+        if coupon.usage_limit == 1 and UserCouponUsage.objects.filter(
+            coupon=coupon, user=user
+        ).exists():
+            return {'error': 'You have already used this coupon.'}
 
-        # New customer coupon check
-        if coupon.is_new_customer:
-            if Order.objects.filter(user=user).exists():
-                return {'error': 'This coupon is for new customers only.'}
+        # New customer restriction
+        if coupon.is_new_customer and Order.objects.filter(user=user).exists():
+            return {'error': 'This coupon is for new customers only.'}
 
         # Calculate discount
         if coupon.discount_type == 'percentage':
             discount = (total_amount * coupon.discount_value) / 100
-            if coupon.max_discount and discount > coupon.max_discount:
-                discount = coupon.max_discount
+            if coupon.max_discount:
+                discount = min(discount, coupon.max_discount)
         else:  # fixed amount
             discount = min(coupon.discount_value, total_amount)
 

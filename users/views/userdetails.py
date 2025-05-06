@@ -210,4 +210,15 @@ class UserInfo(generics.RetrieveDestroyAPIView):
     def get_queryset(self):
         return CustomUser.objects.all()
     
+from django.shortcuts import get_object_or_404
+class SetPrimaryAddressView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, address_id):
+        user = request.user
+        address = get_object_or_404(Address, id=address_id, user=user)
+
+        Address.objects.filter(user=user, is_primary=True).update(is_primary=False)
+        address.is_primary = True
+        address.save()
+        return Response({'detail': 'Primary address set successfully.'}, status=status.HTTP_200_OK)

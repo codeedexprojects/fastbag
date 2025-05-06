@@ -95,6 +95,8 @@ urlpatterns = [
     path('admin/big-buy-order/<int:pk>/update/', AdminBigBuyOrderUpdateView.as_view(), name='admin-big-buy-order-update'),
 
     path('coupons/view/', CouponListView.as_view(), name='vendor-coupon-list'),
+    #set primary address
+    path('set-primary/<int:address_id>/', SetPrimaryAddressView.as_view(), name='set-primary-address'),
 
 
 ] 
