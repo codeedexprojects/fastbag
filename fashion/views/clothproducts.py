@@ -10,6 +10,8 @@ from vendors.authentication import VendorJWTAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser
 from vendors.pagination import CustomPageNumberPagination
 from vendors.serializers import *
+from rest_framework.filters import SearchFilter
+
 class ColorCreateView(generics.CreateAPIView):
     queryset = Color.objects.all()
     serializer_class = ColorSerializer
@@ -34,6 +36,8 @@ class ClothingListCreateView(generics.ListCreateAPIView):
     serializer_class = ClothingSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [VendorJWTAuthentication]
+    filter_backends = [SearchFilter]
+    search_fields = ['name']  
 
 class ClothingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clothing.objects.all()

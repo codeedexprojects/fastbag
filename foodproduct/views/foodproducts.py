@@ -25,9 +25,11 @@ class CustomFoodProductPagination(PageNumberPagination):
 class DishCreateView(generics.ListCreateAPIView):
     queryset = Dish.objects.all()
     serializer_class = DishCreateSerializer
-    pagination_class=CustomFoodProductPagination
-    permission_classes=[IsAuthenticated]
-    authentication_classes=[VendorJWTAuthentication]
+    pagination_class = CustomFoodProductPagination
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [VendorJWTAuthentication]
+    filter_backends = [SearchFilter]
+    search_fields = ['name']
 
 class DishCreateViewAdmin(generics.ListCreateAPIView):
     queryset = Dish.objects.all()

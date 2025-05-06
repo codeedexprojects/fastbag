@@ -21,14 +21,17 @@ class ProductPagination(PageNumberPagination):
 class GroceryProductCreateView(generics.ListCreateAPIView):
     queryset = GroceryProducts.objects.all().order_by('-created_at')  
     serializer_class = GroceryProductSerializer
-    authentication_classes=[VendorJWTAuthentication]
-    permission_classes=[IsAuthenticated]
+    authentication_classes = [VendorJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [SearchFilter]
+    search_fields = ['name']
 
     def perform_create(self, serializer):
         product = serializer.save()
         images_data = self.request.FILES.getlist('images')
         for image in images_data:
             GroceryProductImage.objects.create(product=product, image=image)
+
 #admin
 class GroceryProductCreateViewAdmin(generics.ListCreateAPIView):
     queryset = GroceryProducts.objects.all().order_by('-created_at')  
