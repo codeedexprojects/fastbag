@@ -28,7 +28,9 @@ urlpatterns = [
     #single vendor cart
     path('cart/vendor/<int:vendor_id>/', VendorCartItemsView.as_view(), name='vendor-cart-items'),
     path('checkout/<int:pk>/', VendorCheckoutView.as_view(), name='vendor-checkout'), #check out
-    
+    #order cancel 
+    path('order/cancel/<str:order_id>/', UpdateOrderStatusViewUser.as_view(), name='update-order-status'),  
+
 ]
 
 

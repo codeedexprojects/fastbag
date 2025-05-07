@@ -736,7 +736,6 @@ class VendorCheckoutView(APIView):
 
         # Validate required fields
         shipping_address_id = data.get('shipping_address_id')
-        contact_number = data.get('contact_number')
         payment_method = data.get('payment_method', 'cod')
         coupon_code = data.get('coupon_code')
 
@@ -797,7 +796,6 @@ class VendorCheckoutView(APIView):
                     discount_amount=coupon_discount,
                     final_amount=final_amount,
                     payment_method=payment_method,
-                    contact_number=contact_number or '',
                     shipping_address=address,
                     coupon=coupon,
                     coupon_code=coupon_code if coupon else None,
@@ -852,7 +850,6 @@ class VendorCheckoutView(APIView):
                     payment_method=payment_method,
                     order_status='pending',
                     shipping_address=address,
-                    contact_number=contact_number,
                     used_coupon=checkout.coupon_code,
                     delivery_pin=delivery_pin,
                     product_details=product_details
@@ -1021,3 +1018,19 @@ class VendorCheckoutView(APIView):
             discount = min(coupon.discount_value, total_amount)
 
         return {'coupon': coupon, 'discount': discount}
+    
+class UpdateOrderStatusViewUser(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(order_id=order_id)
+            new_status = request.data.get("order_status")
+            if new_status in dict(Order.ORDER_STATUS_CHOICES).keys():
+                order.order_status = new_status
+                order.save()
+                return Response({"message": f"Order {order_id} status updated to {new_status}"})
+            else:
+                return Response({"error": "Invalid status"}, status=400)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=404)
