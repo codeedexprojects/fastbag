@@ -214,56 +214,20 @@ class BigBuyOrderCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-#order list
 class BigBuyOrderListView(generics.ListAPIView):
     serializer_class = BigBuyOrderSerializer
     permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return BigBuyOrder.objects.filter(user=self.request.user).order_by('-created_at')
-
-
-#  Retrieve a Specific Big Buy Order
-class BigBuyOrderDetailView(generics.RetrieveAPIView):
-    queryset = BigBuyOrder.objects.all()
-    serializer_class = BigBuyOrderSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        return BigBuyOrder.objects.filter(user=self.request.user)
     
-#update
-
-class BigBuyOrderUpdateView(generics.UpdateAPIView):
-    serializer_class = BigBuyOrderSerializer
-    permission_classes = [IsAuthenticated]
-
     def get_queryset(self):
         return BigBuyOrder.objects.filter(user=self.request.user)
 
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        time_diff = timezone.now() - instance.created_at
+class BigBuyOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = BigBuyOrderSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return BigBuyOrder.objects.filter(user=self.request.user)
 
-        if time_diff > timedelta(minutes=10):
-            return Response(
-                {"detail": "You can only edit the order within 10 minutes of placing it."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Optional: Limit fields user can update
-        allowed_fields = {
-            "food_item", "quantity_in_kg", "number_of_people",
-            "preferred_delivery_date", "special_occasion",
-            "diet_category", "additional_notes"
-        }
-        data = {key: value for key, value in request.data.items() if key in allowed_fields}
-
-        serializer = self.get_serializer(instance, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        return Response(serializer.data)
 
 #  Admin: List all Big Buy orders
 class AdminBigBuyOrderListView(generics.ListAPIView):
@@ -284,3 +248,20 @@ class AdminBigBuyOrderUpdateView(generics.UpdateAPIView):
     queryset = BigBuyOrder.objects.all()
     serializer_class = BigBuyOrderSerializer
     permission_classes = [IsAdminUser]
+
+class CancelBigBuyOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = BigBuyOrder.objects.get(id=order_id, user=request.user)
+        except BigBuyOrder.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.status != 'PENDING':
+            return Response({"detail": "Only orders with 'PENDING' status can be cancelled."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = 'CANCELLED'
+        order.save()
+        return Response({"detail": "Order cancelled successfully."}, status=status.HTTP_200_OK)

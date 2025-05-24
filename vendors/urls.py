@@ -84,5 +84,13 @@ urlpatterns = [
     path('admin/approve-subcategory/<int:request_id>/', ApproveSubCategoryRequestView.as_view(), name='approve-subcategory'),
     #sub cat list by category
     path('subcategories/by-category/<int:category_id>/', SubCategoryListByCategory.as_view(), name='subcategory-by-category'),
+    #vendor search
+    path('vendors/search/', VendorSearchView.as_view(), name='vendor-search'),
+    #near by vendors
+    path('vendors/nearby/', NearbyVendorsAPIView.as_view(), name='nearby-vendors'),
+    #cat by locations
+    path('vendors/nearby-categories/', NearbyVendorCategoriesOnlyAPIView.as_view(), name='nearby-vendor-categories'),
+
+
 
 ]

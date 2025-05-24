@@ -182,6 +182,130 @@ class Order(models.Model):
     product_details = models.JSONField(default=list, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    reason = models.CharField(max_length=500,null=True,blank=True)
+    description = models.TextField(null=True,blank=True)
 
     def __str__(self):
         return f"Order {self.order_id} - {self.user.username}"
+    
+
+    def get_active_items(self):
+        return self.order_items.exclude(status='cancelled')
+    
+    def update_order_status(self):
+        items = self.order_items.all()
+        
+        if not items.exists():
+            return
+            
+        if items.filter(status='cancelled').count() == items.count():
+            self.order_status = 'cancelled'
+        elif items.filter(status='cancelled').exists():
+            self.order_status = 'partial_cancelled'
+        
+        self.save()
+    
+    def recalculate_total(self):
+        active_items = self.get_active_items()
+        self.final_amount = sum(item.subtotal for item in active_items)
+        
+        if self.payment_status == 'paid' and self.order_items.filter(status='cancelled').exists():
+            self.payment_status = 'partial_refunded'
+            
+        self.save()
+
+class OrderItem(models.Model):
+    ITEM_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("out for delivery", "Out for Delivery"),
+        ("shipped", "Shipped"),
+        ("delivered", "Delivered"),
+        ("cancelled", "Cancelled"),
+        ("return", "Return"),
+        
+    ]
+    
+    order = models.ForeignKey('Order', related_name='order_items', on_delete=models.CASCADE)
+    product_id = models.IntegerField()  # Changed to IntegerField based on your data
+    product_name = models.CharField(max_length=255)
+    product_type = models.CharField(max_length=50)  # 'clothing', 'grocery', 'dish'
+    quantity = models.PositiveIntegerField()
+    price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=ITEM_STATUS_CHOICES, default='pending')
+    
+    # Variant fields
+    color = models.CharField(max_length=50, null=True, blank=True)
+    size = models.CharField(max_length=50, null=True, blank=True)
+    variant = models.CharField(max_length=100, null=True, blank=True)
+    
+    # Cancellation details
+    cancel_reason = models.TextField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'cart_orderitem'  
+    
+    def __str__(self):
+        return f"{self.product_name} - {self.status}"
+
+
+# models.py
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.title} - {self.user.email}"
+
+
+class VendorNotification(models.Model):
+    NOTIFICATION_TYPES = [
+        ('new_order', 'New Order'),
+        ('order_cancelled', 'Order Cancelled'),
+        ('payment_received', 'Payment Received'),
+        ('refund_request', 'Refund Request'),
+        ('stock_low', 'Low Stock Alert'),
+        ('review_received', 'New Review'),
+        ('general', 'General'),
+    ]
+
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='general')
+    title = models.CharField(max_length=200)
+    message = models.TextField()    
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, null=True, blank=True, related_name='vendor_notifications')
+    checkout = models.ForeignKey('Checkout', on_delete=models.CASCADE, null=True, blank=True, related_name='vendor_notifications')
+    
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    
+    data = models.JSONField(default=dict, blank=True) 
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['vendor', 'is_read']),
+            models.Index(fields=['vendor', 'notification_type']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def mark_as_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['is_read', 'read_at'])
+
+    def __str__(self):
+        return f"{self.vendor.name} - {self.title}"

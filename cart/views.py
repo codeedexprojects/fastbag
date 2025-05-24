@@ -734,61 +734,40 @@ class VendorCheckoutView(APIView):
         user = request.user
         data = request.data
 
-        # Validate required fields
         shipping_address_id = data.get('shipping_address_id')
         payment_method = data.get('payment_method', 'cod')
         coupon_code = data.get('coupon_code')
 
         if not shipping_address_id:
-            return Response(
-                {'error': 'Shipping address is required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Shipping address is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Start atomic transaction
             with transaction.atomic():
-                # Lock relevant database rows
-                address = Address.objects.select_for_update().get(
-                    id=shipping_address_id,
-                    user=user
-                )
+                address = Address.objects.select_for_update().get(id=shipping_address_id, user=user)
                 vendor = Vendor.objects.select_for_update().get(id=vendor_id)
                 cart = Cart.objects.select_for_update().get(user=user)
                 cart_items = cart.items.filter(vendor=vendor).select_related('vendor')
 
                 if not cart_items.exists():
-                    return Response(
-                        {'error': 'No items in cart for this vendor.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({'error': 'No items in cart for this vendor.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Calculate total
                 total_amount = sum(item.price * item.quantity for item in cart_items)
                 coupon = None
                 coupon_discount = Decimal('0.00')
 
-                # Apply coupon if provided
                 if coupon_code:
-                    coupon_result = self.validate_and_apply_coupon(
-                        coupon_code, total_amount, user, vendor_id
-                    )
+                    coupon_result = self.validate_and_apply_coupon(coupon_code, total_amount, user, vendor_id)
                     if 'error' in coupon_result:
-                        return Response(
-                            {'error': coupon_result['error']},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                        return Response({'error': coupon_result['error']}, status=status.HTTP_400_BAD_REQUEST)
                     coupon = coupon_result['coupon']
                     coupon_discount = coupon_result['discount']
 
                 final_amount = total_amount - coupon_discount
                 final_amount = max(final_amount, Decimal('0.00'))
 
-                # Generate order details
                 order_id = f"ORD-{timezone.now().strftime('%Y%m%d%H%M%S')}-{user.id}"
                 delivery_pin = str(random.randint(100000, 999999))
 
-                # Create checkout record
                 checkout = Checkout.objects.create(
                     user=user,
                     order_id=order_id,
@@ -802,10 +781,8 @@ class VendorCheckoutView(APIView):
                     coupon_discount=coupon_discount
                 )
 
-                # Process each cart item
                 product_details = []
                 for item in cart_items:
-                    # Create checkout item
                     CheckoutItem.objects.create(
                         checkout=checkout,
                         vendor=item.vendor,
@@ -818,8 +795,6 @@ class VendorCheckoutView(APIView):
                         price=item.price,
                         subtotal=item.price * item.quantity,
                     )
-
-                    # Record product details
                     product_details.append({
                         "product_id": item.product_id,
                         "variant": item.variant,
@@ -828,19 +803,14 @@ class VendorCheckoutView(APIView):
                         "size": item.size
                     })
 
-                    # Reduce stock
                     try:
                         if item.product_type == 'grocery':
                             self.handle_grocery_stock_reduction(item)
                         elif item.product_type == 'clothing':
                             self.handle_clothing_stock_reduction(item)
                     except Exception as e:
-                        return Response(
-                            {'error': str(e)},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Create order
                 order = Order.objects.create(
                     user=user,
                     checkout=checkout,
@@ -855,18 +825,52 @@ class VendorCheckoutView(APIView):
                     product_details=product_details
                 )
 
-                # Track coupon usage
-                if coupon:
-                    UserCouponUsage.objects.create(
-                        coupon=coupon,
-                        user=user,
-                        checkout=checkout
+                Notification.objects.create(
+                    user=user,
+                    order=order,
+                    title="Order Placed Successfully",
+                    message=f"Your order with ID {order_id} has been placed successfully and will be processed shortly.",
+                )
+
+                for item in cart_items:
+                    product_id = item.product_id
+                    product_type = item.product_type
+                    variant = item.variant
+                    quantity = item.quantity
+                    price = item.price
+                    subtotal = price * quantity
+
+                    product_name = f"Product {product_id}"
+
+                    if product_type.lower() == 'clothing':
+                        product = Clothing.objects.filter(id=product_id).first()
+                        product_name = product.name if product else product_name
+                    elif product_type.lower() == 'grocery':
+                        product = GroceryProducts.objects.filter(id=product_id).first()
+                        product_name = product.name if product else product_name
+                    elif product_type.lower() == 'restaurent':
+                        product = Dish.objects.filter(id=product_id).first()
+                        product_name = product.name if product else product_name
+
+                    OrderItem.objects.create(
+                        order=order,
+                        product_id=product_id,
+                        product_type=product_type,
+                        product_name=product_name,
+                        quantity=quantity,
+                        price_per_unit=price,
+                        subtotal=subtotal,
+                        variant=variant,
+                        status='pending'
                     )
 
-                # Clear cart items
+
+
+                if coupon:
+                    UserCouponUsage.objects.create(coupon=coupon, user=user, checkout=checkout)
+
                 cart_items.delete()
 
-                # Handle payment
                 if payment_method == 'online':
                     try:
                         client = razorpay.Client(
@@ -880,10 +884,7 @@ class VendorCheckoutView(APIView):
                         checkout.razorpay_order_id = razorpay_order['id']
                         checkout.save()
                     except Exception as e:
-                        return Response(
-                            {'error': f'Payment error: {str(e)}'},
-                            status=status.HTTP_503_SERVICE_UNAVAILABLE
-                        )
+                        return Response({'error': f'Payment error: {str(e)}'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
                 return Response({
                     "order_id": order.order_id,
@@ -893,30 +894,22 @@ class VendorCheckoutView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
         except (Vendor.DoesNotExist, Address.DoesNotExist, Cart.DoesNotExist) as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response(
-                {'error': f'Checkout failed: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': f'Checkout failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def handle_grocery_stock_reduction(self, item):
-        """Atomic stock reduction for grocery items"""
         product = GroceryProducts.objects.select_for_update().get(id=item.product_id)
 
         if isinstance(product.weights, list):
-            # Create new list to force JSON field update
             new_weights = []
             found = False
             for weight in product.weights:
+                new_weight = weight.copy()
                 if weight['weight'] == item.variant:
                     if weight['quantity'] < item.quantity:
                         raise ValueError(f"Insufficient stock for {item.variant}")
-                    new_weight = weight.copy()
-                    new_weight['quantity'] = F('quantity') - item.quantity
+                    new_weight['quantity'] = weight['quantity'] - item.quantity
                     new_weight['is_in_stock'] = new_weight['quantity'] > 0
                     found = True
                 new_weights.append(new_weight)
@@ -924,7 +917,6 @@ class VendorCheckoutView(APIView):
             if not found:
                 raise ValueError(f"Variant {item.variant} not found")
 
-            # Update using bulk_update for better performance
             GroceryProducts.objects.filter(id=product.id).update(weights=new_weights)
 
         elif isinstance(product.weights, dict):
@@ -932,24 +924,19 @@ class VendorCheckoutView(APIView):
             if not variant_data or variant_data['quantity'] < item.quantity:
                 raise ValueError(f"Insufficient stock for {item.variant}")
 
-            # Use F expression for atomic update
-            GroceryProducts.objects.filter(id=product.id).update(
-                weights={
-                    **product.weights,
-                    item.variant: {
-                        'quantity': F(f'weights__{item.variant}__quantity') - item.quantity,
-                        'is_in_stock': F(f'weights__{item.variant}__quantity') - item.quantity > 0,
-                        'price': variant_data['price']
-                    }
+            updated_variant = {
+                **product.weights,
+                item.variant: {
+                    'quantity': variant_data['quantity'] - item.quantity,
+                    'is_in_stock': (variant_data['quantity'] - item.quantity) > 0,
+                    'price': variant_data['price']
                 }
-            )
-
+            }
+            GroceryProducts.objects.filter(id=product.id).update(weights=updated_variant)
         else:
             raise ValueError("Invalid weight format")
 
     def handle_clothing_stock_reduction(self, item):
-        """Atomic stock reduction for clothing items"""
-        # Update relational data
         updated = ClothingSize.objects.filter(
             color__clothing_id=item.product_id,
             color__color_name=item.color,
@@ -959,7 +946,6 @@ class VendorCheckoutView(APIView):
         if updated == 0:
             raise ValueError("Size/color combination not found")
 
-        # Verify stock didn't go negative
         size = ClothingSize.objects.get(
             color__clothing_id=item.product_id,
             color__color_name=item.color,
@@ -968,19 +954,16 @@ class VendorCheckoutView(APIView):
         if size.stock < 0:
             raise ValueError("Insufficient stock after reduction")
 
-        # Update JSON representation
         clothing = Clothing.objects.get(id=item.product_id)
         for color in clothing.colors:
             if color['color_name'] == item.color:
-                for size in color.get('sizes', []):
-                    if size['size'] == item.size:
-                        size['stock'] = size.stock  # From relational model
+                for size_entry in color.get('sizes', []):
+                    if size_entry['size'] == item.size:
+                        size_entry['stock'] = size.stock
         clothing.save(update_fields=['colors'])
 
     def validate_and_apply_coupon(self, coupon_code, total_amount, user, vendor_id):
-        """Validate and calculate coupon discount"""
         now = timezone.now()
-
         try:
             coupon = Coupon.objects.get(
                 code=coupon_code,
@@ -991,46 +974,411 @@ class VendorCheckoutView(APIView):
         except Coupon.DoesNotExist:
             return {'error': 'Invalid or expired coupon code.'}
 
-        # Vendor validation
         if coupon.vendor and coupon.vendor.id != int(vendor_id):
             return {'error': 'This coupon is not valid for this vendor.'}
 
-        # Minimum order amount
         if coupon.min_order_amount and total_amount < coupon.min_order_amount:
             return {'error': f'Minimum order amount of {coupon.min_order_amount} required.'}
 
-        # Usage limits
-        if coupon.usage_limit == 1 and UserCouponUsage.objects.filter(
-            coupon=coupon, user=user
-        ).exists():
+        if coupon.usage_limit == 1 and UserCouponUsage.objects.filter(coupon=coupon, user=user).exists():
             return {'error': 'You have already used this coupon.'}
 
-        # New customer restriction
         if coupon.is_new_customer and Order.objects.filter(user=user).exists():
             return {'error': 'This coupon is for new customers only.'}
 
-        # Calculate discount
         if coupon.discount_type == 'percentage':
             discount = (total_amount * coupon.discount_value) / 100
             if coupon.max_discount:
                 discount = min(discount, coupon.max_discount)
-        else:  # fixed amount
+        else:
             discount = min(coupon.discount_value, total_amount)
 
         return {'coupon': coupon, 'discount': discount}
     
-class UpdateOrderStatusViewUser(APIView):
+# views.py
+# class CancelOrderItemView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, order_id, item_id):
+#         try:
+#             # Get the order with permission check
+#             order = get_object_or_404(
+#                 Order,
+#                 order_id=order_id,
+#                 user=request.user
+#             )
+
+#             # Get the specific order item
+#             order_item = get_object_or_404(
+#                 OrderItem,
+#                 id=item_id,
+#                 order=order
+#             )
+
+#             reason = request.data.get('reason', '')
+
+#             if not reason:
+#                 return Response(
+#                     {"error": "Cancellation reason is required"},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#             if order_item.status in ['cancelled', 'delivered']:
+#                 return Response(
+#                     {"error": f"Item is already {order_item.status}"},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#             # Update the order item
+#             order_item.status = 'cancelled'
+#             order_item.cancel_reason = reason
+#             order_item.cancelled_at = timezone.now()
+#             order_item.save()
+
+#             # Update order status and totals
+#             order.update_order_status()
+#             order.recalculate_total()
+#             order.save()
+
+#             # Serialize the response with proper product details
+#             serializer = OrderSerializer(order, context={'request': request})
+
+#             return Response({
+#                 "success": True,
+#                 "message": f"Order item {item_id} cancelled successfully",
+#                 "cancelled_item": {
+#                     "id": order_item.id,
+#                     "product_id": order_item.product_id,
+#                     "product_name": order_item.product_name,
+#                     "status": order_item.status,
+#                     "cancel_reason": order_item.cancel_reason,
+#                     "cancelled_at": order_item.cancelled_at
+#                 },
+#                 "order": serializer.data,
+#                 "new_order_status": order.order_status,
+#                 "new_final_amount": str(order.final_amount)
+#             }, status=status.HTTP_200_OK)
+
+#         except Exception as e:
+#             return Response(
+#                 {"error": str(e)},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            # )
+
+
+# class ReturnOrderItemView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         order_id = request.data.get("order_id")
+#         product_id = request.data.get("product_id")
+#         product_type = request.data.get("product_type")
+#         reason = request.data.get("reason")
+
+#         if not all([order_id, product_id, product_type, reason]):
+#             return Response({"error": "All fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             order_item = OrderItem.objects.get(
+#                 order__id=order_id,
+#                 product_id=product_id,
+#                 product_type=product_type,
+#                 order__user=request.user 
+#             )
+#         except OrderItem.DoesNotExist:
+#             return Response({"error": "Order item not found or access denied."}, status=status.HTTP_404_NOT_FOUND)
+
+#         order_item.order_status = "return"
+#         order_item.cancelled_reason = reason
+#         order_item.save()
+
+#         return Response({"message": "Order item returned successfully."}, status=status.HTTP_200_OK)
+
+
+
+
+
+class DeleteAllOrdersView(APIView):
+    permission_classes = [IsAdminUser] 
+
+    def delete(self, request):
+        total = Order.objects.count()
+        if total == 0:
+            return Response({'message': 'No orders to delete.'}, status=status.HTTP_200_OK)
+
+        Order.objects.all().delete()
+        return Response({'message': f'All {total} orders have been deleted.'}, status=status.HTTP_200_OK)
+
+class CancelOrderItemView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, order_id):
+    def post(self, request, order_id, item_id=None):
+        order = get_object_or_404(Order, order_id=order_id, user=request.user)
+
+        if item_id:
+            order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+
+            if order_item.status in ['cancelled', 'delivered']:
+                return Response(
+                    {"error": f"Cannot cancel item. Current status: {order_item.status}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            order_item.status = 'cancelled'
+            order_item.cancel_reason = request.data.get('reason', '')
+            order_item.cancelled_at = timezone.now()
+            order_item.save()
+
+            order.update_order_status()
+            order.recalculate_total()
+
+            message = "Item cancelled successfully"
+        else:
+            if order.order_status == 'delivered':
+                return Response(
+                    {"error": "Cannot cancel completed order"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            items = OrderItem.objects.filter(order=order)
+            for item in items:
+                if item.status not in ['cancelled', 'delivered']:
+                    item.status = 'cancelled'
+                    item.cancel_reason = request.data.get('reason', '')
+                    item.cancelled_at = timezone.now()
+                    item.save()
+
+            order.order_status = 'cancelled'
+            order.reason = request.data.get('reason', '')
+            order.save()
+
+            message = "Order cancelled successfully"
+
+        serializer = OrderSerializer(order, context={'request': request})
+        return Response({
+            "message": message,
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+class OrderItemsByOrderIDView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
         try:
-            order = Order.objects.get(order_id=order_id)
-            new_status = request.data.get("order_status")
-            if new_status in dict(Order.ORDER_STATUS_CHOICES).keys():
-                order.order_status = new_status
-                order.save()
-                return Response({"message": f"Order {order_id} status updated to {new_status}"})
-            else:
-                return Response({"error": "Invalid status"}, status=400)
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=404)
+            order = get_object_or_404(Order, order_id=order_id, user=request.user)
+            order_items = OrderItem.objects.filter(order=order).order_by('created_at')
+
+            # Collect product IDs by normalized type
+            fashion_ids, dish_ids, grocery_ids = [], [], []
+            normalized_types = {}
+
+            for item in order_items:
+                raw_type = item.product_type.lower()
+                if raw_type in ['restaurant', 'restaurent', 'food']:
+                    product_type = 'dish'
+                    dish_ids.append(item.product_id)
+                elif raw_type in ['grocery', 'groceries']:
+                    product_type = 'grocery'
+                    grocery_ids.append(item.product_id)
+                elif raw_type in ['fashion', 'clothing']:
+                    product_type = 'fashion'
+                    fashion_ids.append(item.product_id)
+                else:
+                    product_type = raw_type  # fallback
+                normalized_types[item.id] = product_type
+
+            # Bulk fetch products
+            fashion_products = {
+                c.id: c for c in Clothing.objects.filter(id__in=fashion_ids)
+            }
+            dish_products = {
+                d.id: d for d in Dish.objects.filter(id__in=dish_ids)
+            }
+            grocery_products = {
+                g.id: g for g in GroceryProducts.objects.filter(id__in=grocery_ids)
+            }
+
+            # Bulk fetch related images
+            fashion_images = {
+                c.id: ClothingImage.objects.filter(clothing=c)
+                for c in fashion_products.values()
+            }
+            dish_images = {
+                d.id: DishImage.objects.filter(dish=d)
+                for d in dish_products.values()
+            }
+            grocery_images = {
+                g.id: GroceryProductImage.objects.filter(product=g)
+                for g in grocery_products.values()
+            }
+
+            items_data = []
+            for item in order_items:
+                product_id = item.product_id
+                product_type = normalized_types.get(item.id)
+                variant = item.variant
+                images = []
+                main_image = None
+                variant_image = None
+                product_name = item.product_name  # default/fallback
+
+                if product_type == 'fashion':
+                    product = fashion_products.get(product_id)
+                    if product:
+                        product_name = product.name
+                        images = [
+                            request.build_absolute_uri(img.image.url)
+                            for img in fashion_images.get(product.id, []) if img.image
+                        ]
+                        main_image = images[0] if images else None
+
+                        # Optional: use color-based variant image
+                        if variant and '-' in variant:
+                            color = variant.split('-')[0].strip().lower()
+                            matched_image = next(
+                                (img for img in fashion_images.get(product.id, [])
+                                 if color in img.image.name.lower()),
+                                None
+                            )
+                            if matched_image:
+                                variant_image = request.build_absolute_uri(matched_image.image.url)
+
+                elif product_type == 'dish':
+                    product = dish_products.get(product_id)
+                    if product:
+                        product_name = product.name
+                        images = [
+                            request.build_absolute_uri(img.image.url)
+                            for img in dish_images.get(product.id, []) if img.image
+                        ]
+                        main_image = images[0] if images else None
+
+                elif product_type == 'grocery':
+                    product = grocery_products.get(product_id)
+                    if product:
+                        product_name = product.name
+                        images = [
+                            request.build_absolute_uri(img.image.url)
+                            for img in grocery_images.get(product.id, []) if img.image
+                        ]
+                        main_image = images[0] if images else None
+
+                item_data = {
+                    "id": item.id,
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "product_type": item.product_type,
+                    "quantity": item.quantity,
+                    "price_per_unit": str(item.price_per_unit),
+                    "subtotal": str(item.subtotal),
+                    "status": item.status,
+                    "variant": item.variant,
+                    "cancel_reason": item.cancel_reason,
+                    "cancelled_at": item.cancelled_at.isoformat() if item.cancelled_at else None,
+                    "created_at": item.created_at.isoformat(),
+                    "updated_at": item.updated_at.isoformat(),
+                    "order_id": item.order_id,
+                    "color": item.color,
+                    "size": item.size,
+                    "product_image": main_image,
+                    "images": images,
+                    "variant_image": variant_image
+                }
+                items_data.append(item_data)
+
+            return Response({
+                "order_id": order.order_id,
+                "order_status": order.order_status,
+                "payment_status": order.payment_status,
+                "final_amount": str(order.final_amount),
+                "items": items_data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+class UserNotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+    
+class ReturnOrderItemView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id, item_id):
+        # Validate Order
+        order = get_object_or_404(Order, order_id=order_id, user=request.user)
+
+        # Validate Order Item
+        order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+
+        if order_item.status != 'delivered':
+            return Response(
+                {"error": f"Only delivered items can be returned. Current status: {order_item.status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark item as returned
+        order_item.status = 'return'
+        order_item.cancel_reason = request.data.get('reason', '')  # Use cancel_reason field for return reason
+        order_item.cancelled_at = timezone.now()  # Reuse this field to store return timestamp
+        order_item.save()
+
+        # Optional: Update overall order status or metrics
+        order.update_order_status()
+        order.recalculate_total()
+
+        serializer = OrderSerializer(order, context={'request': request})
+        return Response({
+            "message": "Item return initiated successfully.",
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+class UpdateOrderItemStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id, item_id):
+        order = get_object_or_404(Order, order_id=order_id, user=request.user)
+        order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+        
+        new_status = request.data.get('status')
+        
+        if not new_status:
+            return Response(
+                {"error": "Status field is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if order_item.status == 'cancelled':
+            return Response(
+                {"error": "Cannot change status of a cancelled item"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Simply update the status (no other validations)
+        order_item.status = new_status
+        order_item.save()
+        
+        return Response({
+            "message": f"Status updated to {new_status}",
+            "new_status": new_status,
+            "item_id": item_id
+        }, status=status.HTTP_200_OK)
+    
+class MarkNotificationAsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, notification_id):
+        try:
+            notification = Notification.objects.get(id=notification_id, user=request.user)
+            notification.is_read = True
+            notification.save()
+            return Response({'message': 'Notification marked as read.'}, status=status.HTTP_200_OK)
+        except Notification.DoesNotExist:
+            return Response({'error': 'Notification not found.'}, status=status.HTTP_404_NOT_FOUND)

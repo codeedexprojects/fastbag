@@ -15,6 +15,7 @@ urlpatterns = [
     #user login
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
     #user address
     path('addresses/', AddressView.as_view(), name='address-list'),
     #address update
@@ -87,8 +88,7 @@ urlpatterns = [
     path('big-buy-order/', BigBuyOrderCreateView.as_view(), name='big-buy-order-create'),
     path('big-buy-orders/', BigBuyOrderListView.as_view(), name='big-buy-order-list'),#list
     path('big-buy-order/<int:pk>/', BigBuyOrderDetailView.as_view(), name='big-buy-order-detail'),#detail
-    #update
-    path('big-buy-order/<int:pk>/edit/', BigBuyOrderUpdateView.as_view(), name='big-buy-order-edit'),
+    path('orders/bigbuy/<int:order_id>/cancel/', CancelBigBuyOrderView.as_view(), name='cancel-bigbuy-order'),#cancel
     #admin
     path('admin/big-buy-orders/', AdminBigBuyOrderListView.as_view(), name='admin-big-buy-order-list'),
     path('admin/big-buy-order/<int:pk>/', AdminBigBuyOrderDetailView.as_view(), name='admin-big-buy-order-detail'),
@@ -97,6 +97,9 @@ urlpatterns = [
     path('coupons/view/', CouponListView.as_view(), name='vendor-coupon-list'),
     #set primary address
     path('set-primary/<int:address_id>/', SetPrimaryAddressView.as_view(), name='set-primary-address'),
+    # user location 
+    path('user-location/create/', UserLocationCreateView.as_view(), name='user-location-create'),
+    path('user-location/update/<int:pk>/', UserLocationUpdateView.as_view(), name='user-location-update'),
 
 
 ] 

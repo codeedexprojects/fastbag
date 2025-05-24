@@ -29,8 +29,21 @@ urlpatterns = [
     path('cart/vendor/<int:vendor_id>/', VendorCartItemsView.as_view(), name='vendor-cart-items'),
     path('checkout/<int:pk>/', VendorCheckoutView.as_view(), name='vendor-checkout'), #check out
     #order cancel 
-    path('order/cancel/<str:order_id>/', UpdateOrderStatusViewUser.as_view(), name='update-order-status'),  
+    path('order-item/cancel/', CancelOrderItemView.as_view(), name='cancel-order-item'),
+    path('order-item/return/', ReturnOrderItemView.as_view(), name='return-order-item'),
+    path('delete-all-orders/', DeleteAllOrdersView.as_view(), name='delete-all-orders'),#delete all orders
+    path('orders/<str:order_id>/cancel/',CancelOrderItemView.as_view(),name='cancel-order'),#cancel whole order
+    # URL for cancelling a specific item within an order
+    path('orders/<str:order_id>/items/<int:item_id>/cancel/',CancelOrderItemView.as_view(),name='cancel-order-item'),
+    path('orders/<str:order_id>/items/',OrderItemsByOrderIDView.as_view(),name='order-items-by-id'),
+    #notifications
+    path('notifications/', UserNotificationListView.as_view(), name='user-notifications'),
+    path('notifications/read/<int:notification_id>/', MarkNotificationAsReadView.as_view(), name='mark-notification-read'),
+    #for return
+    path('orders/<str:order_id>/return/', ReturnOrderItemView.as_view(), name='return-order'),
+    path('orders/<str:order_id>/items/<int:item_id>/return/', ReturnOrderItemView.as_view(), name='return-order-item'),
 
+    path('orders/<str:order_id>/items/<int:item_id>/update-status/',UpdateOrderItemStatusView.as_view(),name='update-order-item-status'),
 ]
 
 

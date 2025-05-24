@@ -317,9 +317,64 @@ class FavoriteVendorSerializer(serializers.ModelSerializer):
         return value
     
 
+class BigBuyOrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BigBuyOrderItem
+        fields = ['id', 'food_item', 'quantity_in_kg']
+
+
 class BigBuyOrderSerializer(serializers.ModelSerializer):
+    order_items = BigBuyOrderItemSerializer(many=True, required=True)
     user_name = serializers.CharField(source='user.name', read_only=True)
+    order_id = serializers.CharField(read_only=True)
+
     class Meta:
         model = BigBuyOrder
-        fields = ['id','food_item','quantity_in_kg','number_of_people','status','preferred_delivery_date','special_occasion','diet_category','additional_notes','created_at','user','user_name']
-        read_only_fields = ['user', 'created_at']
+        fields = [
+            'id',
+            'order_id', 
+            'order_items',
+            'number_of_people',
+            'status',
+            'amount',
+            'preferred_delivery_date',
+            'special_occasion',
+            'diet_category',
+            'additional_notes',
+            'created_at',
+            'user',
+            'user_name'
+            'cancel_reason'
+        ]
+        read_only_fields = ['user', 'created_at', 'order_id']
+
+    
+    def create(self, validated_data):
+        order_items_data = validated_data.pop('order_items')
+        
+        order = BigBuyOrder.objects.create(**validated_data)
+        
+        for item_data in order_items_data:
+            BigBuyOrderItem.objects.create(order=order, **item_data)
+            
+        return order
+    
+    def update(self, instance, validated_data):
+        if 'order_items' in validated_data:
+            order_items_data = validated_data.pop('order_items')
+            
+            instance.order_items.all().delete()
+            
+            for item_data in order_items_data:
+                BigBuyOrderItem.objects.create(order=instance, **item_data)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
+
+class UserLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserLocation
+        fields = ['id', 'latitude', 'longitude']

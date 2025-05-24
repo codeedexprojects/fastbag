@@ -17,6 +17,8 @@ class VendorCreateSerializer(serializers.ModelSerializer):
     display_image = serializers.ImageField(required=True)
     license = serializers.ImageField(required=True)
     store_type_name = serializers.CharField(source='store_type.name', read_only=True)
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
     class Meta:
         model = Vendor
         fields = [
@@ -142,7 +144,7 @@ class VendorPendingDetailSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor
-        fields = ['id','business_name','opening_time','display_image','is_closed']
+        fields = ['id','business_name','','longitude','opening_time','display_image','is_closed']
 
 class VendorHomePageSerializer(serializers.ModelSerializer):
     is_favourite = serializers.SerializerMethodField()

@@ -226,17 +226,30 @@ class BigBuyOrder(models.Model):
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    food_item = models.CharField(max_length=255)
-    quantity_in_kg = models.DecimalField(max_digits=10, decimal_places=2)
     number_of_people = models.PositiveIntegerField()
     preferred_delivery_date = models.DateField()
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00) 
     special_occasion = models.CharField(max_length=255, blank=True, null=True)
     diet_category = models.CharField(max_length=100, blank=True, null=True)
     additional_notes = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')  
     created_at = models.DateTimeField(auto_now_add=True)
+    cancel_reason = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"BigBuyOrder by {self.user} - {self.food_item} [{self.status}]"
-    
+        return f"BigBuyOrder by {self.user} - [{self.status}]"
 
+
+class BigBuyOrderItem(models.Model):
+    order = models.ForeignKey(BigBuyOrder, related_name='order_items', on_delete=models.CASCADE)
+    food_item = models.CharField(max_length=255)
+    quantity_in_kg = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    def __str__(self):
+        return f"{self.food_item} - {self.quantity_in_kg}kg"
+    
+class UserLocation(models.Model):
+    latitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
+    longitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
+    def __str__(self):
+        return f"Location ({self.latitude}, {self.longitude})"
