@@ -457,9 +457,8 @@ class VendorCartSerializer(serializers.Serializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    order_id = serializers.CharField(source="order.order_id",read_only=True)
-
     class Meta:
         model = Notification
-        fields = ['id', 'title', 'message', 'created_at', 'is_read', 'order_id','user']
+        fields = ['id', 'title', 'message', 'notification_type', 'created_at', 'order', 'user']
+        read_only_fields = ['id', 'created_at', 'order', 'user']
 

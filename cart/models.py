@@ -255,57 +255,26 @@ class OrderItem(models.Model):
 
 
 # models.py
+NOTIFICATION_TYPES = [
+    ('new_order', 'New Order'),
+    ('order_cancelled', 'Order Cancelled'),
+    ('payment_received', 'Payment Received'),
+    ('refund_request', 'Refund Request'),
+    ('stock_low', 'Low Stock Alert'),
+    ('review_received', 'New Review'),
+    ('general', 'General'),
+]
+
 class Notification(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    vendor = models.ForeignKey('Vendor', on_delete=models.CASCADE, null=True, blank=True)
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
     message = models.TextField()
+    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES, default='general')
     created_at = models.DateTimeField(auto_now_add=True)
-    is_read = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"{self.title} - {self.user.email}"
-
-
-class VendorNotification(models.Model):
-    NOTIFICATION_TYPES = [
-        ('new_order', 'New Order'),
-        ('order_cancelled', 'Order Cancelled'),
-        ('payment_received', 'Payment Received'),
-        ('refund_request', 'Refund Request'),
-        ('stock_low', 'Low Stock Alert'),
-        ('review_received', 'New Review'),
-        ('general', 'General'),
-    ]
-
-
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='notifications')
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='general')
-    title = models.CharField(max_length=200)
-    message = models.TextField()    
-    order = models.ForeignKey('Order', on_delete=models.CASCADE, null=True, blank=True, related_name='vendor_notifications')
-    checkout = models.ForeignKey('Checkout', on_delete=models.CASCADE, null=True, blank=True, related_name='vendor_notifications')
-    
-    is_read = models.BooleanField(default=False)
-    read_at = models.DateTimeField(null=True, blank=True)
-    
-    data = models.JSONField(default=dict, blank=True) 
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['vendor', 'is_read']),
-            models.Index(fields=['vendor', 'notification_type']),
-            models.Index(fields=['created_at']),
-        ]
 
-    def mark_as_read(self):
-        if not self.is_read:
-            self.is_read = True
-            self.read_at = timezone.now()
-            self.save(update_fields=['is_read', 'read_at'])
 
-    def __str__(self):
-        return f"{self.vendor.name} - {self.title}"
