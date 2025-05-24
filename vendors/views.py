@@ -28,7 +28,9 @@ from rest_framework.exceptions import PermissionDenied
 from vendors.pagination import CustomPageNumberPagination
 from rest_framework import generics, filters
 from rest_framework.pagination import PageNumberPagination
-
+from decimal import Decimal,InvalidOperation
+from geopy.distance import distance as geopy_distance
+from geopy.distance import geodesic
 
 class IsVendor(BasePermission):
     """
@@ -118,7 +120,6 @@ class VendorListCreateView(APIView):
         if serializer.is_valid():
             vendor = serializer.save()
 
-            # Save associated files explicitly if required
             if 'store_logo' in request.FILES:
                 vendor.store_logo = request.FILES['store_logo']
             if 'fssai_certificate' in request.FILES:
@@ -964,3 +965,77 @@ class SubCategoryListByCategory(generics.ListAPIView):
         return SubCategory.objects.filter(
             category_id=category_id,
         )
+    
+class VendorSearchView(generics.ListAPIView):
+    queryset = Vendor.objects.filter(is_active=True, is_approved=True)
+    serializer_class = VendorSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['business_name', 'owner_name', 'city', 'store_id', 'business_location']
+
+class NearbyVendorsAPIView(APIView):
+    def get(self, request):
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+
+        if not latitude or not longitude:
+            return Response({"error": "Both latitude and longitude query parameters are required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_lat = Decimal(latitude)
+            user_long = Decimal(longitude)
+        except InvalidOperation:
+            return Response({"error": "Invalid latitude or longitude values."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user_location = (user_lat, user_long)
+
+        nearby_vendors = []
+        for vendor in Vendor.objects.filter(latitude__isnull=False, longitude__isnull=False, is_approved=True):
+            vendor_location = (vendor.latitude, vendor.longitude)
+            dist = geopy_distance(user_location, vendor_location).km
+            if dist <= 10:
+                nearby_vendors.append(vendor)
+
+        serializer = VendorSerializer(nearby_vendors, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class NearbyVendorCategoriesOnlyAPIView(APIView):
+    def get(self, request):
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+
+        if not latitude or not longitude:
+            return Response({"error": "Latitude and longitude are required."}, status=400)
+
+        user_location = (float(latitude), float(longitude))
+
+        # Get vendors within 10 km
+        nearby_vendors = []
+        for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
+            vendor_location = (float(vendor.latitude), float(vendor.longitude))
+            distance_km = geodesic(user_location, vendor_location).km
+            if distance_km <= 10:
+                nearby_vendors.append(vendor.id)
+
+        # Fetch category IDs from each product type
+        grocery_cats = GroceryProducts.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
+        dish_cats = Dish.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
+        clothing_cats = Clothing.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
+
+        all_category_ids = set(grocery_cats) | set(dish_cats) | set(clothing_cats)
+
+        categories = Category.objects.filter(id__in=all_category_ids).distinct()
+
+        data = [
+            {
+                "id": cat.id,
+                "name": cat.name,
+                "image": request.build_absolute_uri(cat.category_image.url) if cat.category_image else None
+            }
+            for cat in categories
+        ]
+
+        return Response(data)

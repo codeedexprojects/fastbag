@@ -139,8 +139,19 @@ class LoginView(APIView):
                 return Response({"message": "User does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
+
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            token = OutstandingToken.objects.get(token=request.auth.token)
+            BlacklistedToken.objects.create(token=token)
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST) 
     
 class AddressView(APIView):
     permission_classes = [IsAuthenticated]
@@ -210,4 +221,27 @@ class UserInfo(generics.RetrieveDestroyAPIView):
     def get_queryset(self):
         return CustomUser.objects.all()
     
+from django.shortcuts import get_object_or_404
+class SetPrimaryAddressView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request, address_id):
+        user = request.user
+        address = get_object_or_404(Address, id=address_id, user=user)
+
+        Address.objects.filter(user=user, is_primary=True).update(is_primary=False)
+        address.is_primary = True
+        address.save()
+        return Response({'detail': 'Primary address set successfully.'}, status=status.HTTP_200_OK)
+
+
+class UserLocationCreateView(generics.CreateAPIView):
+    permission_classes=[]
+    queryset = UserLocation.objects.all()
+    serializer_class = UserLocationSerializer
+
+class UserLocationUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes=[]
+    queryset = UserLocation.objects.all()
+    serializer_class = UserLocationSerializer
+    lookup_field = 'pk'

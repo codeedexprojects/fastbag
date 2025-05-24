@@ -48,15 +48,15 @@ class  Vendor(models.Model):
     otp_expiry = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     since = models.CharField(max_length=30 , null=True,blank=True)
-    is_pending_update_approval = models.BooleanField(default=False)  # Tracks pending approval for updates
+    is_pending_update_approval = models.BooleanField(default=False)  
     pending_fssai_certificate = models.ImageField(upload_to='fssai_certificate_pending', null=True, blank=True)
     pending_license = models.ImageField(upload_to='license_pending', null=True, blank=True)
     pending_contact_number = models.CharField(max_length=15, null=True, blank=True)
     is_vendor = models.BooleanField(default=True)  
     is_staff = models.BooleanField(default=False) 
     is_favourite = models.BooleanField(default=False)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  
+    latitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
+    longitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
     is_closed = models.BooleanField(default=False) 
 
     def __str__(self):

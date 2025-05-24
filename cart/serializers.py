@@ -4,7 +4,7 @@ from fashion.models import Clothing
 from foodproduct.models import Dish
 from groceryproducts.models import GroceryProducts
 from .models import Checkout, CheckoutItem
-from cart.models import Cart, CartItem , Order
+from cart.models import Cart, CartItem , Order ,OrderItem , Notification
 import uuid
 import razorpay
 from django.conf import settings
@@ -120,7 +120,6 @@ class CheckoutItemSerializer(serializers.ModelSerializer):
         extra_fields = ['product_details']
 
     def get_product_details(self, obj):
-        # Add your actual product models and serializers import here
         from .serializers import ClothingSerializer, DishSerializer, GrocerySerializer
         
         model_map = {
@@ -258,6 +257,25 @@ class CheckoutSerializer(serializers.ModelSerializer):
 
 
 
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id',
+            'product_id',
+            'product_name',
+            'product_type',
+            'quantity',
+            'price_per_unit',
+            'subtotal',
+            'status',
+            'variant',
+            'cancel_reason',
+            'cancelled_at',
+        ]
+        read_only_fields = ['id', 'cancelled_at']
+
+
 class OrderSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True)
     product_details = serializers.SerializerMethodField()
@@ -299,27 +317,33 @@ class OrderSerializer(serializers.ModelSerializer):
             product_id = str(item.get('product_id'))
             quantity = item.get('quantity', 0) or 0
             product = clothings.get(product_id) or groceries.get(product_id) or dishes.get(product_id)
+            product_name = getattr(product, 'name', '') or item.get('product_name', f'Product {product_id}')
 
+            # Initialize product_info with all necessary fields from OrderItemSerializer
             product_info = {
+                "id": item.get('id'),
                 "product_id": product_id,
-                "product_name": item.get('product_name', ''),
+                "product_name": product_name,
+                "product_type": None,
                 "quantity": quantity,
                 "price_per_unit": item.get('price_per_unit', 0),
                 "subtotal": item.get('subtotal', 0),
-                "product_type": None,
+                "status": item.get('status'),
+                "variant": item.get('variant'),
+                "cancel_reason": item.get('cancel_reason'),
+                "cancelled_at": item.get('cancelled_at'),
                 "product_image": "",
                 "images": [],
-                # "error": None,
                 "selected_color": None,
                 "selected_size": None,
                 "available_colors": [],
-                "selected_weight": None,  # Removed available_weights field here
+                "selected_weight": None,
                 "selected_variant": None,
                 "available_variants": [],
             }
 
             if product:
-                # Fallbacks
+                # Fallbacks for missing data
                 if not product_info['product_name']:
                     product_info['product_name'] = getattr(product, 'name', '')
 
@@ -329,7 +353,7 @@ class OrderSerializer(serializers.ModelSerializer):
                 if not product_info['subtotal']:
                     product_info['subtotal'] = quantity * product_info['price_per_unit']
 
-                # Images
+                # Handling images
                 image_urls = []
                 if hasattr(product, 'images'):
                     images = product.images.all()
@@ -338,12 +362,11 @@ class OrderSerializer(serializers.ModelSerializer):
                 product_info['images'] = image_urls
                 product_info['product_image'] = image_urls[0] if image_urls else ''
 
-                # Product-specific logic
+                # Product-specific attribute handling
                 if isinstance(product, Clothing):
                     product_info['product_type'] = 'clothing'
                     product_info['available_colors'] = product.colors or []
 
-                    # Variant smart split
                     variant = item.get('variant')
                     if variant and '-' in variant:
                         color_part, size_part = variant.split('-', 1)
@@ -353,7 +376,7 @@ class OrderSerializer(serializers.ModelSerializer):
                         product_info['selected_color'] = item.get('color')
                         product_info['selected_size'] = item.get('size')
 
-                    # Remove irrelevant fields for clothing type
+                    # Cleanup irrelevant fields
                     product_info.pop('selected_weight', None)
                     product_info.pop('available_weights', None)
                     product_info.pop('selected_variant', None)
@@ -361,16 +384,14 @@ class OrderSerializer(serializers.ModelSerializer):
 
                 elif isinstance(product, GroceryProducts):
                     product_info['product_type'] = 'grocery'
-
-                    # Smart handling for weight selection
                     weight = item.get('weight') or item.get('selected_weight')
-                    if not weight:  # If no selected_weight or weight, fallback to variant
+                    if not weight:
                         variant = item.get('variant')
-                        if variant and 'ml' in variant:  # Assumes the variant format for weight includes "ml"
-                            weight = variant.strip()  # Assign variant as weight if relevant
+                        if variant and 'ml' in variant:
+                            weight = variant.strip()
                     product_info['selected_weight'] = weight
 
-                    # Remove irrelevant fields for grocery type
+                    # Cleanup irrelevant fields
                     product_info.pop('selected_color', None)
                     product_info.pop('selected_size', None)
                     product_info.pop('available_colors', None)
@@ -382,7 +403,7 @@ class OrderSerializer(serializers.ModelSerializer):
                     product_info['available_variants'] = product.variants or []
                     product_info['selected_variant'] = item.get('variant') or item.get('selected_variant')
 
-                    # Remove irrelevant fields for dish type
+                    # Cleanup irrelevant fields
                     product_info.pop('selected_color', None)
                     product_info.pop('selected_size', None)
                     product_info.pop('available_colors', None)
@@ -397,14 +418,13 @@ class OrderSerializer(serializers.ModelSerializer):
         return ordered_items
         
 class CartCheckoutItemSerializer(serializers.ModelSerializer):
-    product_details = serializers.SerializerMethodField()
+    product_details = serializers.SerializerMethodField
 
     class Meta:
         model = CheckoutItem
         fields = ['product_id', 'product_type', 'quantity', 'color', 'size', 'variant', 'price', 'subtotal', 'product_details']
 
     def get_product_details(self, obj):
-        """Fetch product details dynamically based on product type"""
         if obj.product_type == 'clothing':
             product = Clothing.objects.filter(id=obj.product_id).first()
         elif obj.product_type == 'dish':
@@ -434,3 +454,12 @@ class VendorCartSerializer(serializers.Serializer):
 
     def get_vendor_logo(self, obj):
         return obj.get("vendor_logo")
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    order_id = serializers.CharField(source="order.order_id",read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'created_at', 'is_read', 'order_id','user']
+
