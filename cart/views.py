@@ -628,7 +628,7 @@ class VendorOrderListView(APIView):
                 "contact_number": order.contact_number,
                 "created_at": order.created_at,
                 "updated_at": order.updated_at,
-                "products": CheckoutItemSerializer(vendor_items, many=True).data  # Serialize only vendor-specific products
+                "products": CheckoutItemSerializer(vendor_items, many=True).data  
             })
 
         return Response(order_data)
@@ -830,7 +830,26 @@ class VendorCheckoutView(APIView):
                     order=order,
                     title="Order Placed Successfully",
                     message=f"Your order with ID {order_id} has been placed successfully and will be processed shortly.",
+                    notification_type='general'
                 )
+
+                try:
+                    user_name = (
+                        user.get_full_name() if callable(getattr(user, 'get_full_name', None))
+                        else getattr(user, 'username', 'User')
+                    )
+
+                    Notification.objects.create(
+                        user=user,
+                        vendor=vendor,
+                        order=order,
+                        title="New Order Received",
+                        message=f"You have received a new order with ID {order_id} from {user_name}.",
+                        notification_type='new_order'
+                    )
+                except Exception as e:
+                    print(f"notification creation failed: {e}")
+
 
                 for item in cart_items:
                     product_id = item.product_id
@@ -1382,3 +1401,16 @@ class MarkNotificationAsReadView(APIView):
             return Response({'message': 'Notification marked as read.'}, status=status.HTTP_200_OK)
         except Notification.DoesNotExist:
             return Response({'error': 'Notification not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+class VendorNotificationListView(APIView):
+    authentication_classes = [VendorJWTAuthentication]
+
+    def get(self, request):
+        try:
+            vendor = Vendor.objects.get(user=request.user)  
+        except Vendor.DoesNotExist:
+            return Response({"detail": "Vendor profile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        notifications = Notification.objects.filter(vendor__user=self.request.user).order_by('-created_at')
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
