@@ -1395,10 +1395,15 @@ class MarkNotificationAsReadView(APIView):
 
     def post(self, request, notification_id):
         try:
-            notification = Notification.objects.get(id=notification_id, user=request.user)
-            notification.is_read = True
-            notification.save()
-            return Response({'message': 'Notification marked as read.'}, status=status.HTTP_200_OK)
+            notification = Notification.objects.get(id=notification_id)
+
+            if notification.user == request.user or getattr(request.user, 'vendor', None) == notification.vendor:
+                notification.is_read = True
+                notification.save()
+                return Response({'message': 'Notification marked as read.'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Not authorized to update this notification.'}, status=status.HTTP_403_FORBIDDEN)
+
         except Notification.DoesNotExist:
             return Response({'error': 'Notification not found.'}, status=status.HTTP_404_NOT_FOUND)
         
