@@ -973,21 +973,23 @@ class VendorSearchView(generics.ListAPIView):
     filter_backends = [filters.SearchFilter]
     search_fields = ['business_name', 'owner_name', 'city', 'store_id', 'business_location']
 
-class NearbyVendorsAPIView(APIView):
-    def get(self, request):
-        latitude = request.query_params.get('latitude')
-        longitude = request.query_params.get('longitude')
+class NearbyVendorsAPIView(generics.ListAPIView):
+    serializer_class = VendorSerializer
+    pagination_class = CustomPageNumberPagination
+    permission_classes = []
+
+    def get_queryset(self):
+        latitude = self.request.query_params.get('latitude')
+        longitude = self.request.query_params.get('longitude')
 
         if not latitude or not longitude:
-            return Response({"error": "Both latitude and longitude query parameters are required."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Vendor.objects.none()  
 
         try:
             user_lat = Decimal(latitude)
             user_long = Decimal(longitude)
         except InvalidOperation:
-            return Response({"error": "Invalid latitude or longitude values."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Vendor.objects.none()
 
         user_location = (user_lat, user_long)
 
@@ -995,11 +997,31 @@ class NearbyVendorsAPIView(APIView):
         for vendor in Vendor.objects.filter(latitude__isnull=False, longitude__isnull=False, is_approved=True):
             vendor_location = (vendor.latitude, vendor.longitude)
             dist = geopy_distance(user_location, vendor_location).km
-            if dist <= 10:
-                nearby_vendors.append(vendor)
+            if dist <= 20:
+                nearby_vendors.append(vendor.id)
 
-        serializer = VendorSerializer(nearby_vendors, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Vendor.objects.filter(id__in=nearby_vendors)
+
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+
+        if not latitude or not longitude:
+            return Response(
+                {"error": "Both latitude and longitude query parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            Decimal(latitude)
+            Decimal(longitude)
+        except InvalidOperation:
+            return Response(
+                {"error": "Invalid latitude or longitude values."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().list(request, *args, **kwargs)
     
 
 class NearbyVendorCategoriesOnlyAPIView(APIView):
