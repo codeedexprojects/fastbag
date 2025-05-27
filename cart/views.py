@@ -659,6 +659,21 @@ class VendorOrderDetailView(APIView):
         }
 
         return Response(data)
+    
+    def patch(self, request, order_id):
+        vendor = request.user
+        order = get_object_or_404(Order, order_id=order_id, checkout__items__vendor=vendor)
+        vendor_items = order.checkout.items.filter(vendor=vendor)
+
+        for item in vendor_items:
+            item_data = request.data.get(str(item.id), {})
+            if "order_status" in item_data:
+                item.order_status = item_data["order_status"]
+            if "quantity" in item_data:
+                item.quantity = item_data["quantity"]
+            item.save()
+
+        return Response({'message': 'Vendor-specific order items updated successfully.'}, status=status.HTTP_200_OK)
 
 
 from collections import defaultdict
