@@ -974,7 +974,7 @@ class VendorSearchView(generics.ListAPIView):
     search_fields = ['business_name', 'owner_name', 'city', 'store_id', 'business_location']
 
 class NearbyVendorsAPIView(generics.ListAPIView):
-    serializer_class = VendorSerializer
+    serializer_class = VendorDetailSerializer
     pagination_class = CustomPageNumberPagination
     permission_classes = []
 
@@ -1024,17 +1024,19 @@ class NearbyVendorsAPIView(generics.ListAPIView):
         return super().list(request, *args, **kwargs)
     
 
-class NearbyVendorCategoriesOnlyAPIView(APIView):
-    def get(self, request):
-        latitude = request.query_params.get('latitude')
-        longitude = request.query_params.get('longitude')
+class NearbyVendorCategoriesOnlyAPIView(generics.ListAPIView):
+    serializer_class = CategorySerializer
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        latitude = self.request.query_params.get('latitude')
+        longitude = self.request.query_params.get('longitude')
 
         if not latitude or not longitude:
-            return Response({"error": "Latitude and longitude are required."}, status=400)
+            return Category.objects.none()
 
         user_location = (float(latitude), float(longitude))
 
-        # Get vendors within 10 km
         nearby_vendors = []
         for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
             vendor_location = (float(vendor.latitude), float(vendor.longitude))
@@ -1042,22 +1044,64 @@ class NearbyVendorCategoriesOnlyAPIView(APIView):
             if distance_km <= 10:
                 nearby_vendors.append(vendor.id)
 
-        # Fetch category IDs from each product type
         grocery_cats = GroceryProducts.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
         dish_cats = Dish.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
         clothing_cats = Clothing.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
 
         all_category_ids = set(grocery_cats) | set(dish_cats) | set(clothing_cats)
 
-        categories = Category.objects.filter(id__in=all_category_ids).distinct()
+        return Category.objects.filter(id__in=all_category_ids).distinct()
 
-        data = [
-            {
-                "id": cat.id,
-                "name": cat.name,
-                "image": request.build_absolute_uri(cat.category_image.url) if cat.category_image else None
-            }
-            for cat in categories
-        ]
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
 
-        return Response(data)
+        if not latitude or not longitude:
+            return Response({"error": "Latitude and longitude are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+
+            # Modify the image field manually
+            for item in serializer.data:
+                category = queryset.get(id=item['id'])
+                item['image'] = request.build_absolute_uri(category.category_image.url) if category.category_image else None
+
+            return self.get_paginated_response(serializer.data)
+
+        # Fallback: no pagination
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+from cart.models import CheckoutItem,Order
+class VendorOrderAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def get(self, request, vendor_id=None):
+        vendors = Vendor.objects.filter(id=vendor_id) if vendor_id else Vendor.objects.all()
+        analytics = []
+
+        for vendor in vendors:
+            items = CheckoutItem.objects.filter(vendor=vendor).select_related('checkout')
+            order_ids = items.values_list('checkout_id', flat=True).distinct()
+            orders = Order.objects.filter(checkout_id__in=order_ids)
+
+            analytics.append({
+                'vendor_id': vendor.id,
+                'vendor_name': vendor.business_name,
+                'total_orders': orders.count(),
+                'pending_orders': orders.filter(order_status='pending').count(),
+                'delivered_orders': orders.filter(order_status='delivered').count(),
+                'cancelled_orders': orders.filter(order_status='cancelled').count(),
+                # 'total_revenue': orders.aggregate(total=Sum('final_amount'))['total'] or 0.00,
+                # 'paid_orders': orders.filter(payment_status='paid').count(),
+                # 'online_payments': orders.filter(payment_method='online').count(),
+                # 'cod_payments': orders.filter(payment_method='cod').count(),
+            })
+
+        if vendor_id:
+            return Response(analytics[0] if analytics else {"error": "No data found"}, status=200)
+        return Response({'vendor_analytics': analytics}, status=200)

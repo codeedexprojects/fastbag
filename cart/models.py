@@ -55,6 +55,7 @@ class Checkout(models.Model):
         ("out for delivery", "Out for Delivery"),
         ("shipped", "Shipped"),
         ("delivered", "Delivered"),
+        ('rejected', 'Rejected'),
         ("cancelled", "Cancelled"),
         ("return", "Return"),
     ]
@@ -151,6 +152,7 @@ class Order(models.Model):
         ("shipped", "Shipped"),
         ("delivered", "Delivered"),
         ("cancelled", "Cancelled"),
+        ('rejected', 'Rejected'),
         ("return", "Return"),
     ]
 
@@ -254,7 +256,6 @@ class OrderItem(models.Model):
         return f"{self.product_name} - {self.status}"
 
 
-# models.py
 NOTIFICATION_TYPES = [
     ('new_order', 'New Order'),
     ('order_cancelled', 'Order Cancelled'),
