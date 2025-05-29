@@ -600,38 +600,40 @@ class VendorOrderListView(APIView):
     authentication_classes = [VendorJWTAuthentication]
 
     def get(self, request):
-        vendor = request.user  # Assuming vendor logs in to view their orders
+        vendor = request.user
+        status_filter = request.query_params.get('order_status')
 
-        # Fetch orders that have items belonging to the vendor
-        vendor_orders = Order.objects.filter(checkout__items__vendor=vendor).distinct()
+        vendor_orders = Order.objects.filter(checkout__items__vendor=vendor)
+        if status_filter:
+            vendor_orders = vendor_orders.filter(order_status=status_filter)
 
-        # Prefetch related data for better query optimization
-        vendor_orders = vendor_orders.prefetch_related(
-            'checkout__items'
-        )
+        vendor_orders = vendor_orders.distinct().prefetch_related('checkout__items')
 
-        order_data = []
+        serialized_orders = []
         for order in vendor_orders:
-            # Get all items in the order that belong to the vendor
-            vendor_items = order.checkout.items.filter(vendor=vendor)
+            # Filter product_details only for this vendor
+            all_items = order.product_details or []
+            filtered_items = [
+                item for item in all_items
+                if any(
+                    str(item.get('product_id')) == str(product.id)
+                    for product in Clothing.objects.filter(id=item.get('product_id'), vendor=vendor)
+                ) or any(
+                    str(item.get('product_id')) == str(product.id)
+                    for product in GroceryProducts.objects.filter(id=item.get('product_id'), vendor=vendor)
+                ) or any(
+                    str(item.get('product_id')) == str(product.id)
+                    for product in Dish.objects.filter(id=item.get('product_id'), vendor=vendor)
+                )
+            ]
 
-            order_data.append({
-                "order_id": order.order_id,
-                "user_name": order.user.name,
-                "total_amount": order.total_amount,
-                "final_amount": order.final_amount,
-                "used_coupon": order.used_coupon,
-                "payment_method": order.payment_method,
-                "payment_status": order.payment_status,
-                "order_status": order.order_status,
-                "shipping_address": order.shipping_address,
-                "contact_number": order.contact_number,
-                "created_at": order.created_at,
-                "updated_at": order.updated_at,
-                "products": CheckoutItemSerializer(vendor_items, many=True).data  
-            })
+            # Temporarily override product_details for serialization
+            order.product_details = filtered_items
 
-        return Response(order_data)
+            serializer = OrderSerializer(order, context={'request': request})
+            serialized_orders.append(serializer.data)
+
+        return Response(serialized_orders)
     
 class VendorOrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -660,20 +662,62 @@ class VendorOrderDetailView(APIView):
 
         return Response(data)
     
+
+
+from rest_framework.exceptions import ValidationError
+
+class VendorOrderUpdateDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [VendorJWTAuthentication]
+
     def patch(self, request, order_id):
         vendor = request.user
-        order = get_object_or_404(Order, order_id=order_id, checkout__items__vendor=vendor)
-        vendor_items = order.checkout.items.filter(vendor=vendor)
+        order = get_object_or_404(
+            Order, 
+            order_id=order_id, 
+            order_items__vendor=vendor
+        )
 
-        for item in vendor_items:
-            item_data = request.data.get(str(item.id), {})
-            if "order_status" in item_data:
-                item.order_status = item_data["order_status"]
-            if "quantity" in item_data:
-                item.quantity = item_data["quantity"]
-            item.save()
+        # Filter only the items that belong to this vendor
+        vendor_items = order.order_items.filter(vendor=vendor)
 
-        return Response({'message': 'Vendor-specific order items updated successfully.'}, status=status.HTTP_200_OK)
+        updated = False
+        with transaction.atomic():
+            for item in vendor_items:
+                item_data = request.data.get(str(item.id))
+                if not item_data:
+                    continue
+
+                # Update status if present
+                if "status" in item_data:
+                    status_value = item_data["status"]
+                    if status_value not in dict(Order.ORDER_STATUS_CHOICES):
+                        return Response({"error": f"Invalid status '{status_value}' for item {item.id}"}, status=400)
+                    item.status = status_value
+                    updated = True
+
+                # Update quantity if present
+                if "quantity" in item_data:
+                    try:
+                        qty = int(item_data["quantity"])
+                        if qty < 1:
+                            raise ValueError()
+                        item.quantity = qty
+                        # You may want to update subtotal here as well
+                        item.subtotal = qty * item.product.price  # Adjust based on your pricing model
+                        updated = True
+                    except ValueError:
+                        return Response({"error": f"Invalid quantity for item {item.id}"}, status=400)
+
+                item.save()
+
+            if updated:
+                order.update_order_status()
+                order.recalculate_total()
+                return Response({'message': 'Order items updated and order recalculated.'}, status=200)
+            else:
+                return Response({'message': 'No valid updates found in request.'}, status=400)
+
 
 
 from collections import defaultdict

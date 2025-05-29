@@ -90,6 +90,7 @@ urlpatterns = [
     path('vendors/nearby/', NearbyVendorsAPIView.as_view(), name='nearby-vendors'),
     #cat by locations
     path('vendors/nearby-categories/', NearbyVendorCategoriesOnlyAPIView.as_view(), name='nearby-vendor-categories'),
+    path('analytics/vendor-orders/<int:vendor_id>/', VendorOrderAnalyticsView.as_view(), name='vendor-order-analytics'),
 
 
 
