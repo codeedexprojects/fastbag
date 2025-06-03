@@ -71,7 +71,7 @@ class CustomUserDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'mobile_number', 'name', 'email', 
             'is_verified', 'is_active', 'is_staff', 
-             'addresses'
+             'addresses','date_joined'
         ]
 
 class CustomUserListSerializer(serializers.ModelSerializer):
@@ -378,3 +378,7 @@ class UserLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLocation
         fields = ['id', 'latitude', 'longitude']
+
+class StaffLoginSerializer(serializers.Serializer):
+    mobile_number = serializers.CharField()
+    password = serializers.CharField(write_only=True)

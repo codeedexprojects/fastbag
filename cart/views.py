@@ -541,7 +541,7 @@ class CancelOrderView(generics.UpdateAPIView):
     
 class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Order.objects.all()
-    serializer_class = OrderSerializer
+    serializer_class = OrderSerializerAdmin
     permission_classes = [IsAdminUser]
     pagination_class = None
     
@@ -1478,3 +1478,15 @@ class VendorNotificationListView(APIView):
         notifications = Notification.objects.filter(vendor__user=self.request.user).order_by('-created_at')
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class AdminUserOrderListView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    pagination_class = None  
+
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        return Order.objects.filter(user_id=user_id)\
+            .select_related('checkout')\
+            .prefetch_related('checkout__items')
