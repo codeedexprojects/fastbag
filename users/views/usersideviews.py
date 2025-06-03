@@ -237,7 +237,7 @@ class AdminBigBuyOrderListView(generics.ListAPIView):
 
 
 # Retrieve a specific Big Buy order
-class AdminBigBuyOrderDetailView(generics.RetrieveAPIView):
+class AdminBigBuyOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = BigBuyOrder.objects.all()
     serializer_class = BigBuyOrderSerializer
     permission_classes = [IsAdminUser]

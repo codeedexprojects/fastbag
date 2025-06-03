@@ -65,6 +65,40 @@ class AdminLoginView(APIView):
 #         # If validation fails, return the errors
 #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+class StaffLoginView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = StaffLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        mobile_number = serializer.validated_data['mobile_number']
+        password = serializer.validated_data['password']
+
+        user = authenticate(request, mobile_number=mobile_number, password=password)
+
+        if user is None:
+            return Response({'detail': 'Invalid mobile number or password.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.is_staff:
+            return Response({'detail': 'User does not have staff privileges.'}, status=status.HTTP_403_FORBIDDEN)
+
+        refresh = RefreshToken.for_user(user)
+
+        permissions = []
+        if hasattr(user, 'permissions'):
+            permissions = user.permissions if isinstance(user.permissions, list) else list(user.permissions)
+
+        return Response({
+            'message': 'Staff login successful.',
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+            'user_id': user.id,
+            'mobile_number': user.mobile_number,
+            'permissions': permissions
+        }, status=status.HTTP_200_OK)
+
 class RegisterView(APIView):
     permission_classes = []
 

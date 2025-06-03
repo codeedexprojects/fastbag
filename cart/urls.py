@@ -48,6 +48,8 @@ urlpatterns = [
 
     path('orders/<str:order_id>/items/<int:item_id>/update-status/',UpdateOrderItemStatusView.as_view(),name='update-order-item-status'),
     path('vendor/notifications/', VendorNotificationListView.as_view(), name='vendor-notifications'), #vendor notification list
+    path('admin/users/<int:user_id>/orders/', AdminUserOrderListView.as_view(), name='admin-user-orders'),
+
 
 ]
 

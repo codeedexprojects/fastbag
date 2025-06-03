@@ -308,7 +308,6 @@ class OrderSerializer(serializers.ModelSerializer):
         product_details = obj.product_details or []
         product_ids = [item.get('product_id') for item in product_details if item.get('product_id')]
 
-        # Bulk fetch from all product types
         clothings = {str(c.id): c for c in Clothing.objects.filter(id__in=product_ids).prefetch_related('images')}
         groceries = {str(g.id): g for g in GroceryProducts.objects.filter(id__in=product_ids)}
         dishes = {str(d.id): d for d in Dish.objects.filter(id__in=product_ids)}
@@ -319,7 +318,6 @@ class OrderSerializer(serializers.ModelSerializer):
             product = clothings.get(product_id) or groceries.get(product_id) or dishes.get(product_id)
             product_name = getattr(product, 'name', '') or item.get('product_name', f'Product {product_id}')
 
-            # Initialize product_info with all necessary fields from OrderItemSerializer
             product_info = {
                 "id": item.get('id'),
                 "product_id": product_id,
@@ -343,7 +341,6 @@ class OrderSerializer(serializers.ModelSerializer):
             }
 
             if product:
-                # Fallbacks for missing data
                 if not product_info['product_name']:
                     product_info['product_name'] = getattr(product, 'name', '')
 
@@ -353,7 +350,6 @@ class OrderSerializer(serializers.ModelSerializer):
                 if not product_info['subtotal']:
                     product_info['subtotal'] = quantity * product_info['price_per_unit']
 
-                # Handling images
                 image_urls = []
                 if hasattr(product, 'images'):
                     images = product.images.all()
@@ -362,7 +358,6 @@ class OrderSerializer(serializers.ModelSerializer):
                 product_info['images'] = image_urls
                 product_info['product_image'] = image_urls[0] if image_urls else ''
 
-                # Product-specific attribute handling
                 if isinstance(product, Clothing):
                     product_info['product_type'] = 'clothing'
                     product_info['available_colors'] = product.colors or []
@@ -376,7 +371,6 @@ class OrderSerializer(serializers.ModelSerializer):
                         product_info['selected_color'] = item.get('color')
                         product_info['selected_size'] = item.get('size')
 
-                    # Cleanup irrelevant fields
                     product_info.pop('selected_weight', None)
                     product_info.pop('available_weights', None)
                     product_info.pop('selected_variant', None)
@@ -391,7 +385,144 @@ class OrderSerializer(serializers.ModelSerializer):
                             weight = variant.strip()
                     product_info['selected_weight'] = weight
 
+                    product_info.pop('selected_color', None)
+                    product_info.pop('selected_size', None)
+                    product_info.pop('available_colors', None)
+                    product_info.pop('selected_variant', None)
+                    product_info.pop('available_variants', None)
+
+                elif isinstance(product, Dish):
+                    product_info['product_type'] = 'dish'
+                    product_info['available_variants'] = product.variants or []
+                    product_info['selected_variant'] = item.get('variant') or item.get('selected_variant')
+
                     # Cleanup irrelevant fields
+                    product_info.pop('selected_color', None)
+                    product_info.pop('selected_size', None)
+                    product_info.pop('available_colors', None)
+                    product_info.pop('selected_weight', None)
+                    product_info.pop('available_weights', None)
+
+            else:
+                product_info['error'] = 'Product not found'
+
+            ordered_items.append(product_info)
+
+        return ordered_items
+    
+class OrderSerializerAdmin(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    email = serializers.EmailField(source='user.email',read_only=True)
+    mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
+    product_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'order_id',
+            'user',
+            'user_name',
+            'email',
+            'mobile_number',
+            'total_amount',
+            'payment_method',
+            'payment_status',
+            'order_status',
+            'shipping_address',
+            'contact_number',
+            'created_at',
+            'updated_at',
+            'final_amount',
+            'used_coupon',
+            'product_details',
+            'delivery_pin',
+        ]
+
+    def get_product_details(self, obj):
+        ordered_items = []
+        request = self.context.get('request')
+
+        product_details = obj.product_details or []
+        product_ids = [item.get('product_id') for item in product_details if item.get('product_id')]
+
+        clothings = {str(c.id): c for c in Clothing.objects.filter(id__in=product_ids).prefetch_related('images')}
+        groceries = {str(g.id): g for g in GroceryProducts.objects.filter(id__in=product_ids)}
+        dishes = {str(d.id): d for d in Dish.objects.filter(id__in=product_ids)}
+
+        for item in product_details:
+            product_id = str(item.get('product_id'))
+            quantity = item.get('quantity', 0) or 0
+            product = clothings.get(product_id) or groceries.get(product_id) or dishes.get(product_id)
+            product_name = getattr(product, 'name', '') or item.get('product_name', f'Product {product_id}')
+
+            product_info = {
+                "id": item.get('id'),
+                "product_id": product_id,
+                "product_name": product_name,
+                "product_type": None,
+                "quantity": quantity,
+                "price_per_unit": item.get('price_per_unit', 0),
+                "subtotal": item.get('subtotal', 0),
+                "status": item.get('status'),
+                "variant": item.get('variant'),
+                "cancel_reason": item.get('cancel_reason'),
+                "cancelled_at": item.get('cancelled_at'),
+                "product_image": "",
+                "images": [],
+                "selected_color": None,
+                "selected_size": None,
+                "available_colors": [],
+                "selected_weight": None,
+                "selected_variant": None,
+                "available_variants": [],
+            }
+
+            if product:
+                if not product_info['product_name']:
+                    product_info['product_name'] = getattr(product, 'name', '')
+
+                if not product_info['price_per_unit']:
+                    product_info['price_per_unit'] = getattr(product, 'price', 0)
+
+                if not product_info['subtotal']:
+                    product_info['subtotal'] = quantity * product_info['price_per_unit']
+
+                image_urls = []
+                if hasattr(product, 'images'):
+                    images = product.images.all()
+                    image_urls = [request.build_absolute_uri(img.image.url) for img in images if img.image]
+
+                product_info['images'] = image_urls
+                product_info['product_image'] = image_urls[0] if image_urls else ''
+
+                if isinstance(product, Clothing):
+                    product_info['product_type'] = 'clothing'
+                    product_info['available_colors'] = product.colors or []
+
+                    variant = item.get('variant')
+                    if variant and '-' in variant:
+                        color_part, size_part = variant.split('-', 1)
+                        product_info['selected_color'] = color_part.strip()
+                        product_info['selected_size'] = size_part.strip()
+                    else:
+                        product_info['selected_color'] = item.get('color')
+                        product_info['selected_size'] = item.get('size')
+
+                    product_info.pop('selected_weight', None)
+                    product_info.pop('available_weights', None)
+                    product_info.pop('selected_variant', None)
+                    product_info.pop('available_variants', None)
+
+                elif isinstance(product, GroceryProducts):
+                    product_info['product_type'] = 'grocery'
+                    weight = item.get('weight') or item.get('selected_weight')
+                    if not weight:
+                        variant = item.get('variant')
+                        if variant and 'ml' in variant:
+                            weight = variant.strip()
+                    product_info['selected_weight'] = weight
+
                     product_info.pop('selected_color', None)
                     product_info.pop('selected_size', None)
                     product_info.pop('available_colors', None)

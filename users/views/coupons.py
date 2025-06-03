@@ -38,12 +38,13 @@ class CouponListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.is_superuser:
-            # Admin can view all coupons
+        user = request.user
+
+        if user.is_superuser or user.is_staff:
             coupons = Coupon.objects.all()
         else:
             try:
-                vendor = Vendor.objects.get(id=request.user.id)
+                vendor = Vendor.objects.get(id=user.id)
                 coupons = Coupon.objects.filter(vendor=vendor)
             except Vendor.DoesNotExist:
                 return Response({"error": "Vendor not found."}, status=404)
