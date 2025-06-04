@@ -12,6 +12,12 @@ from django.conf import settings
 import razorpay
 from vendors.authentication import VendorJWTAuthentication
 from users.models import Coupon
+from django.db.models.functions import TruncMonth
+from django.db.models import Count, Sum
+from datetime import datetime
+from datetime import timedelta
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 class CartDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -31,8 +37,7 @@ class CartDetailView(APIView):
 
 
 #add to cart
-from rest_framework import generics, status
-from rest_framework.response import Response
+
 
 # class AddToCartView(generics.CreateAPIView):
 #     def create(self, request, *args, **kwargs):
@@ -1490,3 +1495,93 @@ class AdminUserOrderListView(generics.ListAPIView):
         return Order.objects.filter(user_id=user_id)\
             .select_related('checkout')\
             .prefetch_related('checkout__items')
+
+
+
+class MonthlyOrderStatsAPIView(APIView):
+    permission_classes = [IsAdminUser]  
+
+    def get(self, request, *args, **kwargs):
+        current_year = datetime.now().year
+        
+        stats = (
+            Order.objects
+            .filter(created_at__year=current_year)
+            .annotate(month=TruncMonth('created_at'))
+            .values('month')
+            .annotate(
+                total_orders=Count('id'),
+                total_revenue=Sum('final_amount')
+            )
+            .order_by('month')
+        )
+
+        formatted_stats = [
+            {
+                "month": stat["month"].strftime("%B"),
+                "total_orders": stat["total_orders"],
+                "total_revenue": float(stat["total_revenue"] or 0.00)
+            }
+            for stat in stats
+        ]
+
+        return Response(formatted_stats)
+    
+class DailyRevenueComparisonAPIView(APIView):
+    permission_classes = [IsAdminUser]  
+
+    def get(self, request, *args, **kwargs):
+        today = now().date()
+        yesterday = today - timedelta(days=1)
+
+        today_revenue = (
+            Order.objects
+            .filter(created_at__date=today)
+            .aggregate(total=Sum('final_amount'))['total'] or 0.00
+        )
+
+        yesterday_revenue = (
+            Order.objects
+            .filter(created_at__date=yesterday)
+            .aggregate(total=Sum('final_amount'))['total'] or 0.00
+        )
+
+        if yesterday_revenue == 0:
+            percentage_change = 100.0 if today_revenue > 0 else 0.0
+        else:
+            percentage_change = ((today_revenue - yesterday_revenue) / yesterday_revenue) * 100
+
+        data = {
+            "today_revenue": round(today_revenue, 2),
+            "yesterday_revenue": round(yesterday_revenue, 2),
+            "percentage_change": round(percentage_change, 2)
+        }
+
+        return Response(data)
+    
+class OrderRevenueStatsAPIView(APIView):
+    permission_classes = [IsAdminUser] 
+
+    def get_stats(self, start_date=None):
+        queryset = Order.objects.all()
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+
+        return {
+            "orders": queryset.count(),
+            "revenue": round(queryset.aggregate(total=Sum('final_amount'))['total'] or 0.00, 2)
+        }
+
+    def get(self, request, *args, **kwargs):
+        now_time = now()
+
+        data = {
+            "all_time": self.get_stats(),
+            "last_12_months": self.get_stats(now_time - timedelta(days=365)),
+            "last_30_days": self.get_stats(now_time - timedelta(days=30)),
+            "last_7_days": self.get_stats(now_time - timedelta(days=7)),
+            "last_24_hours": self.get_stats(now_time - timedelta(hours=24)),
+        }
+
+        return Response(data)
+
