@@ -1105,3 +1105,21 @@ class VendorOrderAnalyticsView(APIView):
         if vendor_id:
             return Response(analytics[0] if analytics else {"error": "No data found"}, status=200)
         return Response({'vendor_analytics': analytics}, status=200)
+    
+# List & Create
+class AppCarouselListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = AppCarousel.objects.all()
+    serializer_class = AppCarouselSerializer
+
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get('vendor_id')
+        if vendor_id:
+            return self.queryset.filter(vendor_id=vendor_id)
+        return self.queryset
+
+# Retrieve, Update, Delete
+class AppCarouselDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = AppCarousel.objects.all()
+    serializer_class = AppCarouselSerializer

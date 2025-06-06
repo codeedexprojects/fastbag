@@ -299,3 +299,9 @@ class SubCategoryRequestSerializer(serializers.ModelSerializer):
         if request and hasattr(request.user, 'vendor'):
             validated_data['vendor'] = request.user.vendor
         return super().create(validated_data)
+    
+
+class AppCarouselSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppCarousel
+        fields = '__all__'

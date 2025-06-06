@@ -53,6 +53,7 @@ urlpatterns = [
     path('stats/daily-revenue/', DailyRevenueComparisonAPIView.as_view(), name='daily-revenue-stats'),
     path('stats/overview/', OrderRevenueStatsAPIView.as_view(), name='order-revenue-stats'),
     path('stats/revenue-by-date/', RevenueBySpecificDateAPIView.as_view(), name='revenue-by-date'),
+    path('stats/product-vendor-count/', ProductCountAPIView.as_view(), name='product-count'),
 
 
 ]

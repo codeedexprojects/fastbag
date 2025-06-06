@@ -1623,3 +1623,22 @@ class RevenueBySpecificDateAPIView(APIView):
             "date": selected_date,
             "revenue": round(revenue, 2)
         })
+    
+class ProductCountAPIView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        clothing_count = Clothing.objects.count()
+        dish_count = Dish.objects.count()
+        grocery_count = GroceryProducts.objects.count()
+        vendor_count = Vendor.objects.count()
+
+        total = clothing_count + dish_count + grocery_count
+
+        return Response({
+            "clothing": clothing_count,
+            "dishes": dish_count,
+            "grocery": grocery_count,
+            "total_products": total,
+            "vendors": vendor_count
+        })
