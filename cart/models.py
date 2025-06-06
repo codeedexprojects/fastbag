@@ -268,7 +268,7 @@ NOTIFICATION_TYPES = [
 
 class Notification(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
-    vendor = models.ForeignKey('Vendor', on_delete=models.CASCADE, null=True, blank=True)
+    vendor = models.ForeignKey('vendors.Vendor', on_delete=models.CASCADE, null=True, blank=True)
     order = models.ForeignKey('Order', on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255)
     message = models.TextField()
