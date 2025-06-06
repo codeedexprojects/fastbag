@@ -170,3 +170,9 @@ class SubCategoryRequest(models.Model):
     def __str__(self):
         return f"{self.name} (by {self.vendor.business_name}) - {self.status}"
     
+
+class AppCarousel(models.Model):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='carousel_mage')
+    title = models.CharField(max_length=500 , null=True,blank=True)
+    ads_image = models.ImageField(upload_to="carousel_image",null=True,blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
