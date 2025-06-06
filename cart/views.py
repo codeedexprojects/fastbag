@@ -18,6 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 from rest_framework import generics, status
 from rest_framework.response import Response
+from django.utils.dateparse import parse_date
 
 class CartDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1562,11 +1563,7 @@ class DailyRevenueComparisonAPIView(APIView):
 class OrderRevenueStatsAPIView(APIView):
     permission_classes = [IsAdminUser] 
 
-    def get_stats(self, start_date=None):
-        queryset = Order.objects.all()
-        if start_date:
-            queryset = queryset.filter(created_at__gte=start_date)
-
+    def get_stats(self, queryset):
         return {
             "orders": queryset.count(),
             "revenue": round(queryset.aggregate(total=Sum('final_amount'))['total'] or 0.00, 2)
@@ -1574,14 +1571,55 @@ class OrderRevenueStatsAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
         now_time = now()
+        date_param = request.query_params.get('date')
+
+        # Base query
+        all_orders = Order.objects.all()
 
         data = {
-            "all_time": self.get_stats(),
-            "last_12_months": self.get_stats(now_time - timedelta(days=365)),
-            "last_30_days": self.get_stats(now_time - timedelta(days=30)),
-            "last_7_days": self.get_stats(now_time - timedelta(days=7)),
-            "last_24_hours": self.get_stats(now_time - timedelta(hours=24)),
+            "all_time": self.get_stats(all_orders),
+            "last_12_months": self.get_stats(all_orders.filter(created_at__gte=now_time - timedelta(days=365))),
+            "last_30_days": self.get_stats(all_orders.filter(created_at__gte=now_time - timedelta(days=30))),
+            "last_7_days": self.get_stats(all_orders.filter(created_at__gte=now_time - timedelta(days=7))),
+            "last_24_hours": self.get_stats(all_orders.filter(created_at__gte=now_time - timedelta(hours=24))),
         }
+
+        # If a specific date is provided
+        if date_param:
+            selected_date = parse_date(date_param)
+            if selected_date:
+                day_orders = all_orders.filter(created_at__date=selected_date)
+                data["selected_date"] = {
+                    "date": selected_date,
+                    "orders": day_orders.count(),
+                    "revenue": round(day_orders.aggregate(total=Sum('final_amount'))['total'] or 0.00, 2)
+                }
+            else:
+                data["selected_date"] = {"error": "Invalid date format. Use YYYY-MM-DD."}
 
         return Response(data)
 
+class RevenueBySpecificDateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        date_str = request.GET.get('date')
+
+        if not date_str:
+            return Response({"error": "Please provide a 'date' parameter in YYYY-MM-DD format."}, status=400)
+
+        selected_date = parse_date(date_str)
+
+        if not selected_date:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+
+        revenue = (
+            Order.objects
+            .filter(created_at__date=selected_date)
+            .aggregate(total=Sum('final_amount'))['total'] or 0.00
+        )
+
+        return Response({
+            "date": selected_date,
+            "revenue": round(revenue, 2)
+        })
