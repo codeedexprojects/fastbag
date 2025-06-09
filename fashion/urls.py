@@ -19,7 +19,8 @@ urlpatterns = [
     path('clothing/<int:pk>/', ClothingDetailViewAdmin.as_view(), name='clothing-detail'),
     path('clothing-user/<int:pk>/', ClothingDetailViewUser.as_view(), name='clothing-detail'),
     # Clothing Images
-    path('clothing/images/', ClothingImageListCreateView.as_view(), name='clothing-image-list-create'),
+    path('clothing/images/admin/', ClothingImageListCreateView.as_view(), name='clothing-image-list-create'), #admin
+    path('clothing-images/admin/<int:pk>/', ClothingImageRetrieveUpdateDestroyView.as_view(), name='clothing-image-detail'),#admin
     path('clothing/images-add/', ClothingImageListCreateViewVendor.as_view(), name='clothing-image-list-create-vendor'),
     #Delete Images
     path('clothing/images/<int:image_id>/delete/', ClothingImageDeleteView.as_view(), name='clothing-image-delete'),
