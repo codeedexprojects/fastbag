@@ -78,11 +78,18 @@ class ClothingImageListCreateViewVendor(generics.ListCreateAPIView):
     queryset = ClothingImage.objects.all()
     serializer_class = ClothingImageSerializer
     authentication_classes=[VendorJWTAuthentication]
-
+#admin
 class ClothingImageListCreateView(generics.ListCreateAPIView):
     queryset = ClothingImage.objects.all()
     serializer_class = ClothingImageSerializer
     permission_classes = [IsAdminUser]
+    pagination_class=None
+#admin
+class ClothingImageRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = ClothingImage.objects.all()
+    serializer_class = ClothingImageSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class=None
 
 class ClothingImageDeleteView(APIView):
     authentication_classes=[VendorJWTAuthentication]

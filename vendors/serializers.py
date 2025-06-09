@@ -302,6 +302,7 @@ class SubCategoryRequestSerializer(serializers.ModelSerializer):
     
 
 class AppCarouselSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source='vendor.business_name',read_only=True)
     class Meta:
         model = AppCarousel
-        fields = '__all__'
+        fields = ['id','vendor','vendor_name','title','ads_image','created_at']
