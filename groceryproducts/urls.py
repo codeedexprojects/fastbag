@@ -18,7 +18,7 @@ urlpatterns = [
     path('gro-Subcategories/<int:pk>/', GrocerySubCategoryDetailView.as_view(), name='Grocery-sub-category-detail'),
 #products 
     path('products/', GroceryProductCreateView.as_view(), name='Grocery-product-list'),
-    path('products/admin/', GroceryProductCreateViewAdmin.as_view(), name='Grocery-product-list'), #admin
+    path('products/admin/', GroceryProductCreateViewAdmin.as_view(), name='Grocery-product-add'), #admin
     path('products/list/', groceryproductlistviewadmin.as_view(), name='product-list'),
 #product images
     path('Dish/images-add/', GroceryImageListCreateViewVendor.as_view(), name='dish-image-list-create-vendor'),

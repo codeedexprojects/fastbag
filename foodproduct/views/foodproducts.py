@@ -37,6 +37,12 @@ class DishCreateViewAdmin(generics.ListCreateAPIView):
     pagination_class=CustomFoodProductPagination
     permission_classes=[IsAdminUser]
 
+class DishDetailViewAdmin(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Dish.objects.all()
+    serializer_class = DishCreateSerializer
+    lookup_field = 'id'
+    permission_classes=[IsAdminUser]
+
 class DishListViewAdmin(generics.ListAPIView):
     queryset = Dish.objects.all()
     serializer_class = DishCreateSerializer

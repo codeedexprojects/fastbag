@@ -100,6 +100,8 @@ class GroceryProductSerializer(serializers.ModelSerializer):
                 GroceryProductImage.objects.create(product=instance, **image_data)
         return instance
     
+
+
 class ProductSearchSerializer(serializers.Serializer):
     search_query = serializers.CharField(max_length=100, required=True)
 
