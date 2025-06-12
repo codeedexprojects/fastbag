@@ -36,7 +36,7 @@ class GroceryProductCreateView(generics.ListCreateAPIView):
 class GroceryProductCreateViewAdmin(generics.ListCreateAPIView):
     queryset = GroceryProducts.objects.all().order_by('-created_at')  
     serializer_class = GroceryProductSerializer
-    permission_classes=[IsAdminUser]
+    permission_classes=[]
 
     def perform_create(self, serializer):
         product = serializer.save()

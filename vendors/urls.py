@@ -93,6 +93,7 @@ urlpatterns = [
     path('analytics/vendor-orders/<int:vendor_id>/', VendorOrderAnalyticsView.as_view(), name='vendor-order-analytics'),
 
     path('app-carousel/', AppCarouselListCreateView.as_view(), name='app-carousel-list-create'),
+    path('app-carousel/user/', AppCarouselListViewUser.as_view(), name='app-carousel-list-view'),
     path('app-carousel/<int:pk>/', AppCarouselDetailView.as_view(), name='app-carousel-detail'),
 
 

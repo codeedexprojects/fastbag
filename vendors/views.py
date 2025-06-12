@@ -1123,3 +1123,15 @@ class AppCarouselDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     queryset = AppCarousel.objects.all()
     serializer_class = AppCarouselSerializer
+
+
+class AppCarouselListViewUser(generics.ListAPIView):
+    permission_classes = []
+    queryset = AppCarousel.objects.all()
+    serializer_class = AppCarouselSerializer
+
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get('vendor_id')
+        if vendor_id:
+            return self.queryset.filter(vendor_id=vendor_id)
+        return self.queryset

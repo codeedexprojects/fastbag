@@ -9,6 +9,7 @@ urlpatterns = [
 
     path('dishes/', DishCreateView.as_view(), name='Food-dish-create'),
     path('dishes/admin/', DishCreateViewAdmin.as_view(), name='Food-dish-create'), #admin 
+    path('dishes/admin/<int:id>/', DishDetailViewAdmin.as_view(), name='Food-dish-create'), #admin 
     path('dishes/list/', DishListView.as_view(), name='Food-dish-list'),
     path('dishes/list/admin/', DishListViewAdmin.as_view(), name='Food-dish-list-admin'),#admin
     path('dishes/<int:id>/', DishDetailView.as_view(), name='Food-dish-detail'),
