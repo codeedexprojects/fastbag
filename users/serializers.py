@@ -58,13 +58,13 @@ class AddressSerializer(serializers.ModelSerializer):
         model = Address
         fields = [
             'id', 'username','email','address_line1', 'address_line2', 'city', 'state',
-            'country', 'pincode', 'contact_number', 'is_primary','address_name'
+            'country', 'pincode', 'contact_number', 'is_primary','address_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 class CustomUserDetailSerializer(serializers.ModelSerializer):
-    addresses = AddressSerializer(many=True, read_only=True)
+    addresses = AddressSerializer(many=True)
 
     class Meta:
         model = CustomUser
@@ -73,7 +73,18 @@ class CustomUserDetailSerializer(serializers.ModelSerializer):
             'is_verified', 'is_active', 'is_staff', 
              'addresses','date_joined'
         ]
+        def update(self, instance, validated_data):
+            addresses_data = validated_data.pop('addresses', [])
+            instance = super().update(instance, validated_data)
 
+            for address_data in addresses_data:
+                Address.objects.update_or_create(
+                    user=instance,
+                    id=address_data.get('id'),
+                    defaults=address_data
+                )
+            return instance
+        
 class CustomUserListSerializer(serializers.ModelSerializer):
     addresses = AddressSerializer(many=True, read_only=True)
 

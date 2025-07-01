@@ -28,7 +28,8 @@ class DeliveryBoy(models.Model):
     otp_expiration = models.DateTimeField(blank=True, null=True)  # <-- AND THIS
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    latitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
+    longitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True) 
     def __str__(self):
         return self.name
 
@@ -55,17 +56,20 @@ class OrderAssign(models.Model):
         ('PICKED', 'Picked'),
         ('ON_THE_WAY', 'On the way'),
         ('DELIVERED', 'Delivered'),
+        ('RETURNED','Returned'),
+        ('REJECTED','Rejected')
     ])
+    is_rejected = models.BooleanField(default=False)
     is_accepted = models.BooleanField(default=False)
     accepted_by = models.ForeignKey(DeliveryBoy, related_name='accepted_orders', null=True, blank=True, on_delete=models.SET_NULL) 
-
 
     def __str__(self):
         return f"Order {self.order.id} assigned to {self.delivery_boy.name}"
     
 class DeliveryNotification(models.Model):
     delivery_boy = models.ForeignKey(DeliveryBoy, on_delete=models.CASCADE, related_name="notifications")
-    order = models.ForeignKey('cart.Order', on_delete=models.CASCADE, related_name="notifications")  # link to Order
+    order = models.ForeignKey('cart.Order', on_delete=models.CASCADE, related_name="notifications")
+    vendor = models.ForeignKey('vendors.Vendor', on_delete=models.CASCADE, related_name="delivery_notifications", null=True, blank=True)
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)

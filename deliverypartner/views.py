@@ -46,7 +46,7 @@ def generate_otp():
 def send_otp_email(delivery_boy):
     otp = generate_otp()
     delivery_boy.otp = otp
-    delivery_boy.otp_expiration = timezone.now() + timedelta(minutes=5)  # OTP expires in 5 minutes
+    delivery_boy.otp_expiration = timezone.now() + timedelta(minutes=5)  
     delivery_boy.save()
 
     send_mail(
@@ -72,10 +72,9 @@ class RequestOTPView(APIView):
             except DeliveryBoy.DoesNotExist:
                 return Response({"message": "No account found with this email."}, status=status.HTTP_404_NOT_FOUND)
 
-            # Send OTP to the delivery boy's email
             send_otp_email(delivery_boy)
 
-            return Response({"message": "OTP sent successfully!"}, status=status.HTTP_200_OK)
+            return Response({"message": "OTP sent successfully!","otp":delivery_boy.otp}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -106,7 +105,7 @@ class LoginWithOTPView(APIView):
                 "message": "Login successful!",
                 "delivery_boy_id": delivery_boy.id,
                 "email": delivery_boy.email,
-                "name": delivery_boy.name  # if you have a 'name' field
+                "name": delivery_boy.name  
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -134,6 +133,7 @@ class OrderAssignCreateView(generics.CreateAPIView):
 #assigned order list
 class DeliveryBoyAssignedOrdersView(generics.ListAPIView):
     serializer_class = OrderAssignSerializer
+    permission_classes= []
 
     def get_queryset(self):
         delivery_boy_id = self.kwargs['delivery_boy_id']
@@ -161,7 +161,7 @@ class OrderAssignStatusFilterView(generics.ListAPIView):
         return queryset
     
 class DeliveryBoyNotificationListView(APIView):
-    permission_classes = [IsAuthenticated]  # You can customize this
+    permission_classes = []  
 
     def get(self, request, delivery_boy_id):
         try:
@@ -265,3 +265,61 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
             "delivery_boy_id": delivery_boy_id,
             "order_id": order_id
         }, status=status.HTTP_200_OK)
+
+class DeliveryBoyOrderListView(generics.ListAPIView):
+    serializer_class = DeliveryNotificationSerializer
+    permission_classes = []  
+
+    def get_queryset(self):
+        delivery_boy_id = self.kwargs['delivery_boy_id']
+        return DeliveryNotification.objects.filter(delivery_boy_id=delivery_boy_id).select_related('order')
+    
+class AcceptedOrderListView(generics.ListAPIView):
+    serializer_class = AcceptedOrderSerializer
+    permission_classes = []
+
+    def get_queryset(self):
+        delivery_boy_id = self.kwargs.get('delivery_boy_id')
+        return OrderAssign.objects.filter(
+            is_accepted=True,
+            accepted_by_id=delivery_boy_id
+        ).select_related('order', 'accepted_by', 'order__checkout', 'order__user')
+    
+
+class RejectOrderView(generics.UpdateAPIView):
+    permission_classes = []
+    def update(self, request, *args, **kwargs):
+        order_id = kwargs.get('order_id')
+        delivery_boy_id = kwargs.get('delivery_boy_id')
+
+        try:
+            order_assignment = OrderAssign.objects.get(order__id=order_id, delivery_boy_id=delivery_boy_id)
+        except OrderAssign.DoesNotExist:
+            return Response(
+                {"detail": "No OrderAssign matches the given query."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if order_assignment.is_rejected:
+            return Response(
+                {"detail": "This order is already marked as rejected by this delivery boy."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if order_assignment.is_accepted:
+            return Response(
+                {"detail": "This order is already accepted and cannot be rejected."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        order_assignment.is_rejected = True
+        order_assignment.status = 'REJECTED'
+        order_assignment.save()
+
+        delivery_boy = order_assignment.delivery_boy
+
+        return Response({
+            "message": "Order rejected successfully.",
+            "order_id": order_assignment.order.id,
+            "delivery_boy_id": delivery_boy.id,
+            "delivery_boy_name": delivery_boy.name,
+            "status": order_assignment.status
+        }, status=status.HTTP_200_OK)
+    
