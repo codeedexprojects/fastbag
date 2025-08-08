@@ -327,16 +327,17 @@ def generate_and_send_otp(vendor_admin):
         fail_silently=False,
     )
 
+from users.utils import send_otp_2factor
 class VendorLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = VendorLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
+        mobile_number = serializer.validated_data['mobile_number']
 
         try:
-            vendor_admin = Vendor.objects.get(email=email)
+            vendor_admin = Vendor.objects.get(contact_number=mobile_number)
         except Vendor.DoesNotExist:
             return Response({"error": "Vendor not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -344,8 +345,18 @@ class VendorLoginView(APIView):
             return Response({"error": "Your account has not been approved yet. Please contact support."}, 
                             status=status.HTTP_403_FORBIDDEN)
 
-        generate_and_send_otp(vendor_admin)
-        return Response({"message": "OTP sent to email","otp":vendor_admin.otp}, status=status.HTTP_200_OK)
+        otp = str(random.randint(100000, 999999))
+        vendor_admin.otp = otp
+        vendor_admin.otp_created_at = timezone.now()
+        vendor_admin.save()
+
+        try:
+            send_otp_2factor(vendor_admin.contact_number, otp)
+        except Exception as e:
+            return Response({"error": f"Failed to send OTP: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"message": "OTP sent successfully"}, status=status.HTTP_200_OK)
+
 
 class VendorOTPVerifyView(APIView):
     permission_classes = [AllowAny]
@@ -353,30 +364,35 @@ class VendorOTPVerifyView(APIView):
     def post(self, request):
         serializer = VendorOTPVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
+        mobile_number = serializer.validated_data['mobile_number']
         otp = serializer.validated_data['otp']
 
         try:
-            vendor_admin = Vendor.objects.get(email=email, otp=otp)
+            vendor_admin = Vendor.objects.get(contact_number=mobile_number)
         except Vendor.DoesNotExist:
-            return Response({"error": "Invalid OTP or email"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Vendor not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+        if vendor_admin.otp != otp:
+            return Response({"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
         vendor_admin.otp = None
+        vendor_admin.otp_created_at = None
         vendor_admin.save()
 
         # Generate JWT tokens
-        refresh = RefreshToken.for_user(vendor_admin)  
+        refresh = RefreshToken.for_user(vendor_admin)
         refresh["user_id"] = vendor_admin.id
         store = StoreType.objects.filter(vendor=vendor_admin).first()
+
         return Response({
             "message": "Login successful",
             "Vendor-Admin": vendor_admin.id,
-            "store":store.name,
+            "store": store.name if store else None,
             "refresh": str(refresh),
             "access": str(refresh.access_token),
             "is_approved": vendor_admin.is_approved
         }, status=status.HTTP_200_OK)
-
 
 from rest_framework_simplejwt.views import TokenRefreshView
 class VendorTokenRefreshView(TokenRefreshView):
@@ -1135,3 +1151,80 @@ class AppCarouselListViewUser(generics.ListAPIView):
         if vendor_id:
             return self.queryset.filter(vendor_id=vendor_id)
         return self.queryset
+
+from math import radians, sin, cos, sqrt, atan2
+from django.shortcuts import get_object_or_404
+ 
+class VendorByCategoryLocationView(APIView):
+
+    def get(self, request, category_id):
+        # Get the category
+        category = get_object_or_404(Category, id=category_id)
+
+        # Get user location from params
+        try:
+            user_lat = float(request.query_params.get("lat"))
+            user_lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "lat and lon query parameters are required and must be numbers."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Auto-convert if too large (like microdegrees from Postman example)
+        if abs(user_lat) > 90 or abs(user_lon) > 180:
+            user_lat = user_lat / 10000.0
+            user_lon = user_lon / 10000.0
+
+        # Validate
+        if not (-90 <= user_lat <= 90 and -180 <= user_lon <= 180):
+            return Response({"error": "Invalid latitude/longitude values."}, status=400)
+
+        # Get vendors for category store_type
+        vendors = Vendor.objects.filter(
+            store_type=category.store_type,
+            is_active=True,
+            is_approved=True
+        ).exclude(latitude__isnull=True, longitude__isnull=True)
+
+        vendor_list = []
+        for vendor in vendors:
+            try:
+                v_lat = float(vendor.latitude)
+                v_lon = float(vendor.longitude)
+            except (TypeError, ValueError):
+                continue
+
+            if not (-90 <= v_lat <= 90 and -180 <= v_lon <= 180):
+                continue
+
+            # Calculate distance
+            distance = self.haversine(user_lat, user_lon, v_lat, v_lon)
+
+            # Only include vendors within 20 km
+            if distance <= 20:
+                vendor_list.append({
+                    "id": vendor.id,
+                    "business_name": vendor.business_name,
+                    "owner_name": vendor.owner_name,
+                    "store_logo": request.build_absolute_uri(vendor.store_logo.url) if vendor.store_logo else None,
+                    "address": vendor.address,
+                    "city": vendor.city,
+                    "state": vendor.state,
+                    "pincode": vendor.pincode,
+                    "distance_km": round(distance, 2)
+                })
+
+        # Sort by nearest
+        vendor_list.sort(key=lambda x: x["distance_km"])
+
+        return Response(vendor_list)
+
+    def haversine(self, lat1, lon1, lat2, lon2):
+        R = 6371  # Radius of Earth in km
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return R * c

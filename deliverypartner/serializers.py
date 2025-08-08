@@ -29,12 +29,21 @@ class DeliveryBoySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Mobile number must be at least 10 digits.")
         return value
 
+# class OTPLoginSerializer(serializers.Serializer):
+#     email = serializers.EmailField()
+#     otp = serializers.CharField(max_length=6)
+
+# class OTPRequestSerializer(serializers.Serializer):
+#     email = serializers.EmailField()
+
 class OTPLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    mobile_number = serializers.CharField(max_length=15)
     otp = serializers.CharField(max_length=6)
 
+
 class OTPRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    mobile_number = serializers.CharField(max_length=15)
+
 
 from cart.serializers import OrderSerializer
 class OrderAssignSerializer(serializers.ModelSerializer):

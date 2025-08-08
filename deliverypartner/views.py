@@ -40,24 +40,9 @@ class DeliveryBoyDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-def generate_otp():
-    return str(random.randint(100000, 999999))
-
-def send_otp_email(delivery_boy):
-    otp = generate_otp()
-    delivery_boy.otp = otp
-    delivery_boy.otp_expiration = timezone.now() + timedelta(minutes=5)  
-    delivery_boy.save()
-
-    send_mail(
-        'Your OTP for Login',
-        f'Your OTP is {otp}. It will expire in 5 minutes.',
-        settings.DEFAULT_FROM_EMAIL,
-        [delivery_boy.email],
-    )
-
 from rest_framework.views import APIView
 # ---- Request OTP View ----
+from users.utils import send_otp_2factor
 class RequestOTPView(APIView):
     permission_classes = []
     authentication_classes = []
@@ -65,16 +50,28 @@ class RequestOTPView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
-            
+            mobile_number = serializer.validated_data['mobile_number']
+
             try:
-                delivery_boy = DeliveryBoy.objects.get(email=email)
+                delivery_boy = DeliveryBoy.objects.get(mobile_number=mobile_number)
             except DeliveryBoy.DoesNotExist:
-                return Response({"message": "No account found with this email."}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"message": "No account found with this mobile number."},
+                                status=status.HTTP_404_NOT_FOUND)
 
-            send_otp_email(delivery_boy)
+            # Generate OTP (6-digit)
+            otp = str(random.randint(100000, 999999))
+            delivery_boy.otp = otp
+            delivery_boy.otp_created_at = timezone.now()
+            delivery_boy.save()
 
-            return Response({"message": "OTP sent successfully!","otp":delivery_boy.otp}, status=status.HTTP_200_OK)
+            # Send OTP via 2Factor API
+            try:
+                send_otp_2factor(mobile_number, otp)
+            except Exception as e:
+                return Response({"message": f"Failed to send OTP: {str(e)}"},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({"message": "OTP sent successfully!"}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -87,29 +84,30 @@ class LoginWithOTPView(APIView):
     def post(self, request):
         serializer = OTPLoginSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            mobile_number = serializer.validated_data['mobile_number']
             otp = serializer.validated_data['otp']
 
             try:
-                delivery_boy = DeliveryBoy.objects.get(email=email)
+                delivery_boy = DeliveryBoy.objects.get(mobile_number=mobile_number)
             except DeliveryBoy.DoesNotExist:
-                return Response({"message": "No account found with this email."}, status=status.HTTP_404_NOT_FOUND)
-
-            if not delivery_boy.is_otp_valid():
-                return Response({"message": "OTP is invalid or expired."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "No account found with this mobile number."},
+                                status=status.HTTP_404_NOT_FOUND)
 
             if delivery_boy.otp != otp:
                 return Response({"message": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
 
+            delivery_boy.otp = None
+            delivery_boy.otp_created_at = None
+            delivery_boy.save()
+
             return Response({
                 "message": "Login successful!",
                 "delivery_boy_id": delivery_boy.id,
-                "email": delivery_boy.email,
-                "name": delivery_boy.name  
+                "mobile_number": delivery_boy.mobile_number,
+                "name": delivery_boy.name
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class DeliveryBoyDetailViewUser(generics.RetrieveUpdateDestroyAPIView):

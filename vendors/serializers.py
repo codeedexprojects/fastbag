@@ -26,7 +26,7 @@ class VendorCreateSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','id_proof'
         ]
         
 
@@ -76,7 +76,7 @@ class VendorDetailSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite','id_proof'
         ]
 
     def get_fssai_certificate(self, obj):
@@ -162,11 +162,13 @@ class VendorHomePageSerializer(serializers.ModelSerializer):
         return False
 
 class VendorLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    mobile_number = serializers.CharField(max_length=15)
+
 
 class VendorOTPVerifySerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    otp = serializers.CharField(max_length=4)
+    mobile_number = serializers.CharField(max_length=15)
+    otp = serializers.CharField(max_length=6)
+
 
 class VendorApprovalStatusSerializer(serializers.ModelSerializer):
     class Meta:

@@ -32,6 +32,7 @@ class  Vendor(models.Model):
     pincode = models.CharField(max_length=10)
     store_logo = models.ImageField(upload_to='store_logos/')
     license = models.ImageField(upload_to='license')
+    id_proof = models.ImageField(upload_to='idproof',null=True)
     display_image = models.ImageField(upload_to='display_image', null=True, blank=True)
     store_description = models.TextField()
     fssai_no = models.CharField(max_length=100, null=True, blank=True)
