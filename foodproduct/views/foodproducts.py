@@ -71,6 +71,17 @@ class DishListView(generics.ListAPIView):
     pagination_class = CustomFoodProductPagination
 
 
+    def get_queryset(self):
+        queryset = Dish.objects.all()
+        is_veg_param = self.request.query_params.get('is_veg')
+
+        if is_veg_param is not None:
+            is_veg_bool = is_veg_param.lower() in ['true', '1', 'yes']
+            queryset = queryset.filter(is_veg=is_veg_bool)
+
+        return queryset
+
+
 class SingleDishDetailView(APIView):
     permission_classes = []
     def get(self, request, pk):
