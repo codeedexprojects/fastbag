@@ -38,6 +38,7 @@ class Dish(models.Model):
     discount = models.DecimalField(max_digits=5, decimal_places=2, help_text="Discount percentage", default=0)
     is_available = models.BooleanField(default=True)
     is_offer_product = models.BooleanField(default=False)
+    is_veg = models.BooleanField(default=False)
     is_popular_product = models.BooleanField(default=False)
     variants = models.JSONField(default=list,help_text="Store different variants (name, price, stock status) as a dictionary")
     created_at = models.DateTimeField(auto_now_add=True)

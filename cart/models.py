@@ -216,6 +216,10 @@ class Order(models.Model):
             
         self.save()
 
+    @property
+    def vendors(self):
+        return Vendor.objects.filter(order_items__checkout=self.checkout).distinct()
+
 class OrderItem(models.Model):
     ITEM_STATUS_CHOICES = [
         ("pending", "Pending"),

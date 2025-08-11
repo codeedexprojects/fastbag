@@ -66,7 +66,7 @@ class DishCreateSerializer(serializers.ModelSerializer):
                   'subcategory', 'subcategory_name', 'name', 'description', 'price',
                   'wholesale_price', 'offer_price', 'variants', 'discount',
                   'is_available', 'images', 'image_files', 'is_popular_product',
-                  'is_offer_product', 'is_available', 'store_type']
+                  'is_offer_product', 'is_available', 'store_type','is_veg']
 
     def create(self, validated_data):
         image_files = validated_data.pop('image_files', [])
@@ -105,7 +105,7 @@ class Dishlistserializer(serializers.ModelSerializer):
         model = Dish
         fields = ['id','vendor','vendor_name','category','category_name','subcategory','subcategory_name', 'name', 'description', 'price',
                   'offer_price', 'discount', 'is_available', 'images', 'image_urls', 'is_popular_product',
-                  'is_offer_product', 'is_available']
+                  'is_offer_product', 'is_available','is_veg']
 
 
 class ProductSearchSerializer(serializers.Serializer):

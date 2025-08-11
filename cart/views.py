@@ -598,7 +598,7 @@ class UpdateOrderStatusView(APIView):
 class AllorderviewAdmin(generics.ListAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = OrderSerializer
-    queryset = Order.objects.all()
+    queryset = Order.objects.all().order_by('-created_at')
     pagination_class =None
 
 class VendorOrderListView(APIView):
@@ -1529,23 +1529,23 @@ class MonthlyOrderStatsAPIView(APIView):
         return Response(formatted_stats)
     
 class DailyRevenueComparisonAPIView(APIView):
-    permission_classes = [IsAdminUser]  
+    permission_classes = [IsAdminUser]
 
     def get(self, request, *args, **kwargs):
         today = now().date()
         yesterday = today - timedelta(days=1)
 
-        today_revenue = (
-            Order.objects
-            .filter(created_at__date=today)
-            .aggregate(total=Sum('final_amount'))['total'] or 0.00
-        )
+        today_revenue = Order.objects.filter(
+            created_at__date=today
+        ).aggregate(total=Sum('final_amount'))['total'] or Decimal('0.00')
 
-        yesterday_revenue = (
-            Order.objects
-            .filter(created_at__date=yesterday)
-            .aggregate(total=Sum('final_amount'))['total'] or 0.00
-        )
+        yesterday_revenue = Order.objects.filter(
+            created_at__date=yesterday
+        ).aggregate(total=Sum('final_amount'))['total'] or Decimal('0.00')
+
+        # Ensure both are converted to float before subtraction
+        today_revenue = float(today_revenue)
+        yesterday_revenue = float(yesterday_revenue)
 
         if yesterday_revenue == 0:
             percentage_change = 100.0 if today_revenue > 0 else 0.0

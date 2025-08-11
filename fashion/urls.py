@@ -14,6 +14,7 @@ urlpatterns = [
     # Clothing
     path('clothing/', ClothingListCreateView.as_view(), name='clothing-list-create'),
     path('clothing/list/admin/', ClothingListViewAdmin.as_view(), name='clothing-list-admin'),
+    path('clothing/list/user/', ClothingListViewUser.as_view(), name='clothing-list-user'),
     path('clothing/admin/', ClothingListCreateViewAdmin.as_view(), name='clothing-list-create-admin'),
     path('clothing/details/<int:pk>/', ClothingDetailView.as_view(), name='clothing-detail'),
     path('clothing/<int:pk>/', ClothingDetailViewAdmin.as_view(), name='clothing-detail'),

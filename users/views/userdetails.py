@@ -230,7 +230,7 @@ class UserUpdateView(APIView):
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class UserDetailView(generics.RetrieveDestroyAPIView):
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserDetailSerializer
     permission_classes = [IsAdminUser]
@@ -279,3 +279,14 @@ class UserLocationUpdateView(generics.RetrieveUpdateDestroyAPIView):
     queryset = UserLocation.objects.all()
     serializer_class = UserLocationSerializer
     lookup_field = 'pk'
+
+
+class AdminUserAddressUpdateView(generics.RetrieveUpdateAPIView):
+    queryset = Address.objects.all()
+    serializer_class = AddressSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_object(self):
+        user_id = self.kwargs.get('user_id')
+        address_id = self.kwargs.get('address_id')
+        return Address.objects.get(id=address_id, user__id=user_id)

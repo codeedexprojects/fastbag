@@ -61,11 +61,17 @@ class ClothingListViewAdmin(generics.ListAPIView):
     permission_classes = [IsAdminUser]
     pagination_class=None    
 
+class ClothingListViewUser(generics.ListAPIView):
+    queryset = Clothing.objects.all()
+    serializer_class = ClothingSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class=None  
+
 class ClothingDetailViewAdmin(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clothing.objects.all()
     serializer_class = ClothingSerializer
     permission_classes = [IsAdminUser]
-    parser_classes = [MultiPartParser, FormParser]
+    # parser_classes = [MultiPartParser, FormParser]
 
 class ClothingDetailViewUser(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clothing.objects.all()
