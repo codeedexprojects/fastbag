@@ -24,3 +24,15 @@ def send_otp_2factor(mobile_number, otp):
 #         'refresh': str(refresh),
 #         'access': str(refresh.access_token),
 #     }
+
+
+from math import radians, sin, cos, sqrt, atan2
+
+def haversine(lat1, lon1, lat2, lon2):
+
+    R = 6371  # Earth radius in KM
+    dlat = radians(float(lat2) - float(lat1))
+    dlon = radians(float(lon2) - float(lon1))
+    a = sin(dlat / 2) ** 2 + cos(radians(float(lat1))) * cos(radians(float(lat2))) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c

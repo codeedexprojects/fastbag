@@ -33,6 +33,7 @@ class  Vendor(models.Model):
     store_logo = models.ImageField(upload_to='store_logos/')
     license = models.ImageField(upload_to='license')
     id_proof = models.ImageField(upload_to='idproof',null=True)
+    passbook_image = models.ImageField(upload_to='passbook',null=True)
     display_image = models.ImageField(upload_to='display_image', null=True, blank=True)
     store_description = models.TextField()
     fssai_no = models.CharField(max_length=100, null=True, blank=True)
@@ -176,4 +177,12 @@ class AppCarousel(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='carousel_mage')
     title = models.CharField(max_length=500 , null=True,blank=True)
     ads_image = models.ImageField(upload_to="carousel_image",null=True,blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class AppCarouselByLocation(models.Model):
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='carousel_imagebyloc')
+    title = models.CharField(max_length=500, null=True, blank=True)
+    ads_image = models.ImageField(upload_to="carousel_image", null=True, blank=True)
+    latitude = models.FloatField(null=True, blank=True)   
+    longitude = models.FloatField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)

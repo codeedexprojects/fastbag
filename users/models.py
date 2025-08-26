@@ -176,10 +176,6 @@ class Coupon(models.Model):
         return f"{self.code} - {self.vendor.business_name if self.vendor else 'Admin'}"
 
 
-
-
-
-    
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 

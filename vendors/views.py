@@ -31,15 +31,14 @@ from rest_framework.pagination import PageNumberPagination
 from decimal import Decimal,InvalidOperation
 from geopy.distance import distance as geopy_distance
 from geopy.distance import geodesic
+from math import radians, sin, cos, sqrt, atan2
+from django.shortcuts import get_object_or_404
 
 class IsVendor(BasePermission):
-    """
-    Custom permission class to check if the authenticated user is a vendor.
-    """
+   
 
     def has_permission(self, request, view):
         user = request.user
-        # Check if the user is authenticated and is an instance of Vendor
         if user and user.is_authenticated:
             return isinstance(user, Vendor)
         return False
@@ -97,7 +96,7 @@ class StoreDetailView(generics.RetrieveUpdateDestroyAPIView):
 # for creating and displaying vendors
 class VendorListCreateView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [MultiPartParser, FormParser]  # Add parsers for file handling
+    parser_classes = [MultiPartParser, FormParser]  
     
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -231,7 +230,7 @@ class VendorEnableDisableView(generics.UpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         vendor = self.get_object()
-        enable_status = request.data.get('is_active')  # Handle the `is_active` field
+        enable_status = request.data.get('is_active')  
         if isinstance(enable_status, str):
             enable_status = enable_status.lower() in ["true", "1"]
         if enable_status not in [True, False]:
@@ -318,7 +317,6 @@ def generate_and_send_otp(vendor_admin):
     vendor_admin.otp = otp
     vendor_admin.save()
     
-    # Send OTP to the delivery boy's email
     send_mail(
         'Your Login OTP',
         f'Your OTP for login is {otp}.',
@@ -551,7 +549,6 @@ class SubCategoryListView(APIView):
             "grocery_subcategories": grocery_serializer.data,
             "food_subcategories": food_serializer.data,
         }
-
         return Response(data, status=status.HTTP_200_OK)
 
 class VendorProductListView(APIView):
@@ -1145,6 +1142,19 @@ class AppCarouselListViewUser(generics.ListAPIView):
     permission_classes = []
     queryset = AppCarousel.objects.all()
     serializer_class = AppCarouselSerializer
+    pagination_class =None
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get('vendor_id')
+        if vendor_id:
+            return self.queryset.filter(vendor_id=vendor_id)
+        return self.queryset
+
+#create loc based ads 
+class AdsCarouselListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = AppCarouselByLocation.objects.all()
+    serializer_class = AppCarouselSerializerByLoc
+    pagination_class = None
 
     def get_queryset(self):
         vendor_id = self.request.query_params.get('vendor_id')
@@ -1152,16 +1162,48 @@ class AppCarouselListViewUser(generics.ListAPIView):
             return self.queryset.filter(vendor_id=vendor_id)
         return self.queryset
 
-from math import radians, sin, cos, sqrt, atan2
-from django.shortcuts import get_object_or_404
+class AdsCarouselListViewUserLoc(generics.ListAPIView):
+    permission_classes = []
+    serializer_class = AppCarouselSerializerByLoc
+    pagination_class =None
+
+    def get_queryset(self):
+        queryset = AppCarouselByLocation.objects.all()
+
+        user_lat = self.request.query_params.get('lat')
+        user_lon = self.request.query_params.get('lon')
+
+        if user_lat and user_lon:
+            user_lat = float(user_lat)
+            user_lon = float(user_lon)
+
+            nearby_ads = []
+            for ad in queryset:
+                if ad.latitude and ad.longitude:
+                    distance = self.haversine(user_lat, user_lon, ad.latitude, ad.longitude)
+                    if distance <= 30:  # Only ads within 20km
+                        ad.distance = round(distance, 2) 
+                        nearby_ads.append(ad)
+
+            return nearby_ads
+
+        return queryset
+
+    def haversine(self, lat1, lon1, lat2, lon2):
+        R = 6371 
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return R * c
+
+
  
 class VendorByCategoryLocationView(APIView):
 
     def get(self, request, category_id):
-        # Get the category
         category = get_object_or_404(Category, id=category_id)
 
-        # Get user location from params
         try:
             user_lat = float(request.query_params.get("lat"))
             user_lon = float(request.query_params.get("lon"))
@@ -1171,16 +1213,13 @@ class VendorByCategoryLocationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Auto-convert if too large (like microdegrees from Postman example)
         if abs(user_lat) > 90 or abs(user_lon) > 180:
             user_lat = user_lat / 10000.0
             user_lon = user_lon / 10000.0
 
-        # Validate
         if not (-90 <= user_lat <= 90 and -180 <= user_lon <= 180):
             return Response({"error": "Invalid latitude/longitude values."}, status=400)
 
-        # Get vendors for category store_type
         vendors = Vendor.objects.filter(
             store_type=category.store_type,
             is_active=True,
@@ -1198,11 +1237,9 @@ class VendorByCategoryLocationView(APIView):
             if not (-90 <= v_lat <= 90 and -180 <= v_lon <= 180):
                 continue
 
-            # Calculate distance
             distance = self.haversine(user_lat, user_lon, v_lat, v_lon)
 
-            # Only include vendors within 20 km
-            if distance <= 20:
+            if distance <= 16:
                 vendor_list.append({
                     "id": vendor.id,
                     "business_name": vendor.business_name,
@@ -1215,13 +1252,12 @@ class VendorByCategoryLocationView(APIView):
                     "distance_km": round(distance, 2)
                 })
 
-        # Sort by nearest
         vendor_list.sort(key=lambda x: x["distance_km"])
 
         return Response(vendor_list)
 
     def haversine(self, lat1, lon1, lat2, lon2):
-        R = 6371  # Radius of Earth in km
+        R = 6371  
         lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
         dlat = lat2 - lat1
         dlon = lon2 - lon1
