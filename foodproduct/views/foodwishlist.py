@@ -81,17 +81,11 @@ class DishReviewListView(generics.ListAPIView):
   
     queryset = DishReview.objects.all()
     serializer_class = DishReviewSerializer
-    permission_classes = [IsAuthenticated]  # Optional: Use this to restrict access
+    permission_classes = [IsAuthenticated]  
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-
-    # Filtering fields
     filterset_fields = ['dish__id', 'user__id', 'rating']
-
-    # Searchable fields
     search_fields = ['review', 'dish__name', 'user__username']
-
-    # Ordering options
     ordering_fields = ['created_at', 'rating', 'dish__name']
-    ordering = ['-created_at']  # Default ordering
+    ordering = ['-created_at']  
 
 

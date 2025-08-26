@@ -736,7 +736,6 @@ def get_vendor_out_of_stock_counts(vendor_id):
         if all_variants_out_of_stock:
             counts['food'] += 1
     
-    # Calculate total
     counts['total'] = counts['clothing'] + counts['grocery'] + counts['food']
     
     return counts

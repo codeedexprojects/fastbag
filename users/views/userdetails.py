@@ -18,7 +18,8 @@ from users.serializers import AddressSerializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 import random
-# Create your views here.
+from django.shortcuts import get_object_or_404
+
 
 class AdminLoginView(APIView):
     permission_classes = []
@@ -255,7 +256,6 @@ class UserInfo(generics.RetrieveDestroyAPIView):
     def get_queryset(self):
         return CustomUser.objects.all()
     
-from django.shortcuts import get_object_or_404
 class SetPrimaryAddressView(APIView):
     permission_classes = [IsAuthenticated]
 

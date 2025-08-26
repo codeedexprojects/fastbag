@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound
 from vendors.authentication import VendorJWTAuthentication
 from vendors.pagination import CustomPageNumberPagination
 from vendors.models import SubCategory
+
 # View for Categories
 class FoodCategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()

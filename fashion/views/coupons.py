@@ -15,34 +15,28 @@ class CouponListCreateView(generics.ListCreateAPIView):
 
 
 class ApplyCouponView(APIView):
-    """
-    View to apply a coupon to a product.
-    """
-    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         product_id = request.data.get('product_id')
         coupon_code = request.data.get('coupon_code')
 
-        # Validate the product
         try:
             product = Clothing.objects.get(id=product_id)
         except Clothing.DoesNotExist:
             raise ValidationError("Product not found.")
 
-        # Validate the coupon
         try:
             coupon = Coupon.objects.get(code=coupon_code)
         except Coupon.DoesNotExist:
             raise ValidationError("Invalid coupon code.")
 
-        # Apply the coupon
         try:
             discounted_price = product.apply_coupon(coupon, request.user)  
         except ValueError as e:
             raise ValidationError(str(e))
 
-        # Return the response
         return Response({
             "original_price": product.price,
             "discounted_price": discounted_price,
@@ -51,30 +45,21 @@ class ApplyCouponView(APIView):
 
 
 class CouponUsageListView(generics.ListAPIView):
-    """
-    List all coupon usage records for the authenticated user.
-    """
+
     serializer_class = CouponUsageSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Filter the queryset to only include coupon usages for the current user.
-        """
+ 
         return CouponUsage.objects.filter(user=self.request.user)
     
 class CouponUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    API view to update an existing coupon.
-    """
+
     queryset = Coupon.objects.all()
     serializer_class = CouponUpdateSerializer
     permission_classes = [IsAdminUser]
 
     def get_queryset(self):
-        """
-        Optionally filter the queryset if needed, e.g., admin-only updates.
-        """
         return super().get_queryset()
     
     

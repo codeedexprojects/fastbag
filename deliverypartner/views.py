@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework import generics
 from .models import DeliveryBoy
 from .serializers import *
@@ -6,15 +5,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 import random
-from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from rest_framework.decorators import api_view
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
 from vendors.authentication import VendorJWTAuthentication
+from rest_framework.views import APIView
+from users.utils import send_otp_2factor
 
 
 class DeliveryBoyListCreateView(generics.ListCreateAPIView):
@@ -40,9 +38,7 @@ class DeliveryBoyDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-from rest_framework.views import APIView
 # ---- Request OTP View ----
-from users.utils import send_otp_2factor
 class RequestOTPView(APIView):
     permission_classes = []
     authentication_classes = []
@@ -58,13 +54,11 @@ class RequestOTPView(APIView):
                 return Response({"message": "No account found with this mobile number."},
                                 status=status.HTTP_404_NOT_FOUND)
 
-            # Generate OTP (6-digit)
             otp = str(random.randint(100000, 999999))
             delivery_boy.otp = otp
             delivery_boy.otp_created_at = timezone.now()
             delivery_boy.save()
 
-            # Send OTP via 2Factor API
             try:
                 send_otp_2factor(mobile_number, otp)
             except Exception as e:

@@ -19,7 +19,6 @@ class CouponCreateView(APIView):
             except Vendor.DoesNotExist:
                 return Response({"error": "Vendor not found."}, status=404)
 
-        # Proceed to create coupon
         serializer = CouponSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(vendor=vendor, created_by=request.user)

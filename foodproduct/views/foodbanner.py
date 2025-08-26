@@ -19,22 +19,15 @@ class VendorBannerFoodProductsRetrieveUpdateDestroyAPIView(generics.RetrieveUpda
     permission_classes = [IsSuperUserOrAdmin]
 
     def get(self, request, *args, **kwargs):
-        # Retrieve the banner
         return super().get(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        # Update the banner
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        # Delete the banner
         return super().destroy(request, *args, **kwargs)
 
 class VendorBannerFoodProductsListView(generics.ListAPIView):
-    """
-    List view for VendorBannerFoodProducts.
-    Only accessible by superusers.
-    """
     queryset = VendorBannerFoodProducts.objects.all()
     serializer_class = VendorBannerFoodProductsSerializer
     permission_classes = [IsAuthenticated, IsSuperUserOrAdmin]

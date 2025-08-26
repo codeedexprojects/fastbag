@@ -16,10 +16,8 @@ class GroceryCouponListCreateView(generics.ListCreateAPIView):
 
 
 class GroceryApplyCouponView(APIView):
-    """
-    View to apply a coupon to a product.
-    """
-    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         product_id = request.data.get('product_id')
@@ -52,9 +50,7 @@ class GroceryApplyCouponView(APIView):
 
 
 class GroceryCouponUsageListView(generics.ListAPIView):
-    """
-    List all coupon usage records for the authenticated user.
-    """
+
     serializer_class = GroceryCouponUsageSerializer
     permission_classes = [IsAuthenticated]
 
@@ -65,9 +61,7 @@ class GroceryCouponUsageListView(generics.ListAPIView):
         return GroceryCouponUsage.objects.filter(user=self.request.user)
     
 class GroceryCouponUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    API view to update an existing coupon.
-    """
+
     queryset = GroceryCoupon.objects.all()
     serializer_class = GroceryCouponUpdateSerializer
     permission_classes = [IsAdminUser]

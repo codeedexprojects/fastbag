@@ -5,6 +5,7 @@ from .models import FoodOffer, FoodCoupon
 from .serializers import OfferSerializer, CouponSerializer
 from django.utils.timezone import now
 from rest_framework.permissions import IsAuthenticated
+
 # Offer Views
 class FoodOfferListView(APIView):
     permission_classes=[IsAuthenticated]

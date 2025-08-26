@@ -58,9 +58,7 @@ class GroceryProductDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        Handle GET request to retrieve a product
-        """
+
         try:
             product = self.get_object()  
             serializer = self.get_serializer(product)

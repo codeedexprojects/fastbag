@@ -32,4 +32,4 @@ class AdminNotificationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def mark_all_read(self, request):
         updated = UserRegNotification.objects.filter(is_read=False).update(is_read=True)
-        return Response({'status': f'{updated} notifications marked read'})
+        return Response({'status': f'{updated} notifications marked read'}) 

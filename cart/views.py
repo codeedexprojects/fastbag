@@ -13,7 +13,7 @@ import razorpay
 from vendors.authentication import VendorJWTAuthentication
 from users.models import Coupon
 from django.db.models.functions import TruncMonth
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum,F
 from datetime import datetime
 from datetime import timedelta
 from rest_framework import generics, status
@@ -415,7 +415,6 @@ class CheckoutView(generics.CreateAPIView):
         user = request.user
         print(f"DEBUG: User ID: {user.id}")
 
-        # Validate the incoming data using the serializer
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
@@ -442,7 +441,7 @@ class CheckoutView(generics.CreateAPIView):
             print(f"Coupon fetched: {coupon}")
 
             # Check if the current date is within the valid range
-            current_date = timezone.now()  # Use timezone-aware datetime
+            current_date = timezone.now()  
 
             if not (coupon.valid_from <= current_date <= coupon.valid_to):
                 return Response({"error": "Coupon is not valid anymore."}, status=status.HTTP_400_BAD_REQUEST)
@@ -495,7 +494,7 @@ class CheckoutView(generics.CreateAPIView):
             try:
                 client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
                 razorpay_order = client.order.create({
-                    "amount": int(total_amount * 100),  # Convert to paisa
+                    "amount": int(total_amount * 100),  
                     "currency": "INR",
                     "payment_capture": "1"
                 })
@@ -633,7 +632,6 @@ class VendorOrderListView(APIView):
                 )
             ]
 
-            # Temporarily override product_details for serialization
             order.product_details = filtered_items
 
             serializer = OrderSerializer(order, context={'request': request})
@@ -684,7 +682,6 @@ class VendorOrderUpdateDetailView(APIView):
             order_items__vendor=vendor
         )
 
-        # Filter only the items that belong to this vendor
         vendor_items = order.order_items.filter(vendor=vendor)
 
         updated = False
@@ -1316,7 +1313,6 @@ class OrderItemsByOrderIDView(APIView):
                         ]
                         main_image = images[0] if images else None
 
-                        # Optional: use color-based variant image
                         if variant and '-' in variant:
                             color = variant.split('-')[0].strip().lower()
                             matched_image = next(
@@ -1396,10 +1392,8 @@ class ReturnOrderItemView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id, item_id):
-        # Validate Order
         order = get_object_or_404(Order, order_id=order_id, user=request.user)
 
-        # Validate Order Item
         order_item = get_object_or_404(OrderItem, id=item_id, order=order)
 
         if order_item.status != 'delivered':
@@ -1408,13 +1402,11 @@ class ReturnOrderItemView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Mark item as returned
         order_item.status = 'return'
         order_item.cancel_reason = request.data.get('reason', '')  # Use cancel_reason field for return reason
-        order_item.cancelled_at = timezone.now()  # Reuse this field to store return timestamp
+        order_item.cancelled_at = timezone.now()  
         order_item.save()
 
-        # Optional: Update overall order status or metrics
         order.update_order_status()
         order.recalculate_total()
 
@@ -1445,7 +1437,6 @@ class UpdateOrderItemStatusView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Simply update the status (no other validations)
         order_item.status = new_status
         order_item.save()
         
@@ -1543,7 +1534,6 @@ class DailyRevenueComparisonAPIView(APIView):
             created_at__date=yesterday
         ).aggregate(total=Sum('final_amount'))['total'] or Decimal('0.00')
 
-        # Ensure both are converted to float before subtraction
         today_revenue = float(today_revenue)
         yesterday_revenue = float(yesterday_revenue)
 
