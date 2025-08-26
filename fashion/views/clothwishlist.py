@@ -18,7 +18,6 @@ class WishlistListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         wishlist_item = serializer.save(user=self.request.user)
-        # Update is_wishlisted to True
         wishlist_item.cloth.is_wishlisted = True
         wishlist_item.cloth.save()
 
@@ -62,7 +61,6 @@ class WishlistDeleteView(generics.DestroyAPIView):
             cloth = wishlist_item.cloth
             wishlist_item.delete()
 
-            # Set is_wishlisted=False if no one else has it in wishlist
             if not FashionWishlist.objects.filter(cloth=cloth).exists():
                 cloth.is_wishlisted = False
                 cloth.save()
@@ -93,18 +91,15 @@ class FashionReviewListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Filter reviews for a specific clothing item
         cloth_id = self.request.query_params.get('cloth')
         if cloth_id:
             return FashionReview.objects.filter(cloth_id=cloth_id)
         return FashionReview.objects.all()
 
     def perform_create(self, serializer):
-        # Ensure the review is associated with the authenticated user
         serializer.save(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        # Check if the user has already reviewed this item
         cloth_id = request.data.get('cloth')
         user = request.user
 
@@ -131,7 +126,6 @@ class FashionReviewDeleteView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Ensure users can only delete their own reviews
         return FashionReview.objects.filter(user=self.request.user)
     
 class FashionReviewByClothIDView(generics.ListAPIView):
@@ -148,13 +142,11 @@ class FashionReportListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Admins see all reports; users see only their own reports
         if self.request.user.is_staff:
             return FashionReport.objects.all()
         return FashionReport.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        # Ensure the report is associated with the authenticated user
         serializer.save(user=self.request.user)
 
 class FashionReportUpdateView(generics.UpdateAPIView):
@@ -180,7 +172,6 @@ class FashionReportDeleteView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Admins can delete any report; users can delete only their own reports
         if self.request.user.is_staff:
             return FashionReport.objects.all()
         return FashionReport.objects.filter(user=self.request.user)

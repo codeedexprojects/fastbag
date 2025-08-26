@@ -6,8 +6,6 @@ from users.models import CustomUser
 from users.serializers import *
 
 
-
-
 # Create staff user (Admin-only)
 class CreateStaffView(generics.CreateAPIView):
     serializer_class = CreateStaffUserSerializer

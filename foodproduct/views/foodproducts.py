@@ -101,7 +101,6 @@ class VendorProductListView(APIView):
         except Vendor.DoesNotExist:
             return Response({"detail": "Vendor not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        # Get all products for this vendor
         products = Dish.objects.filter(vendor=vendor)
         serializer = DishCreateSerializer(products, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -117,7 +116,6 @@ class DishStatsView(APIView):
         popular_dishes = Dish.objects.filter(is_popular_product=True).count()
         offer_dishes = Dish.objects.filter(is_offer_product=True).count()
 
-        # Prepare response data
         data = {
             "total_dishes": total_dishes,
             "available_dishes": available_dishes,
@@ -204,13 +202,11 @@ class ReportDishView(APIView):
         user = request.user
         reason = data.get('reason')
 
-        # Validate the dish ID
         try:
             dish = Dish.objects.get(id=dish_id)
         except Dish.DoesNotExist:
             return Response({'error': 'Dish not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Create the report
         report = DishReport.objects.create(dish=dish, user=user, reason=reason)
         serializer = DishReportSerializer(report)
 
@@ -234,12 +230,10 @@ class ResolveDishReportView(APIView):
 
     def patch(self, request, pk, *args, **kwargs):
         try:
-            # Get the report by primary key
             dish_report = DishReport.objects.get(pk=pk)
         except DishReport.DoesNotExist:
             return Response({'error': 'Dish report not found.'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Update the is_resolved field
         is_resolved = request.data.get('is_resolved', None)
         if is_resolved is not None:
             dish_report.is_resolved = is_resolved

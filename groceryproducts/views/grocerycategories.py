@@ -12,6 +12,7 @@ from rest_framework.exceptions import NotFound
 from vendors.serializers import *
 from vendors.authentication import VendorJWTAuthentication
 from vendors.pagination import CustomPageNumberPagination
+from rest_framework.exceptions import PermissionDenied
 
 class CustomGorceryProductPagination(PageNumberPagination):
     page_size = 10
@@ -90,20 +91,18 @@ class GrocerySubCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class GroVendorByCategoryView(generics.ListAPIView):
     permission_classes = [AllowAny]
-    serializer_class = VendorSerializer  # Assume VendorSerializer is defined to serialize Vendor details
+    serializer_class = VendorSerializer  
 
     def get_queryset(self):
         category_name = self.request.query_params.get('category_name', None)
         if not category_name:
             raise NotFound("Category name is required.")
 
-        # Fetch categories matching the name and enabled status
         categories = Category.objects.filter(name__icontains=category_name, Enable_category=True)
         if not categories.exists():
             raise NotFound("No categories found with the given name.")
 
-        # Get vendor IDs associated with the matching categories
-        vendor_ids = categories.values_list('store', flat=True)  # Assuming `store` links to Vendor
+        vendor_ids = categories.values_list('store', flat=True) 
         vendors = Vendor.objects.filter(id__in=vendor_ids, is_active=True, is_approved=True)
 
         return vendors
@@ -157,7 +156,6 @@ class VendorsByGroceryCategoryView(APIView):
         else:
             return Response({"detail": "Category not found"}, status=404)
 
-from rest_framework.exceptions import PermissionDenied
 class GrocerySubCategoryListByCategory(generics.ListAPIView):
     serializer_class = SubCategorySerializer
     pagination_class = CustomPageNumberPagination

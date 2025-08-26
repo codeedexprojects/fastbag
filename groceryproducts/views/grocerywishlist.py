@@ -13,18 +13,14 @@ class Grocery_WishlistView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """
-        Retrieve all wishlist items for the logged-in user.
-        """
+
         user = request.user
         wishlist_items = Grocery_Wishlist.objects.filter(user=user)
         serializer = GroceryWishlistSerializer(wishlist_items, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        """
-        Add a product to the wishlist.
-        """
+
         user = request.user
         product_id = request.data.get('product_id')
         
@@ -46,9 +42,7 @@ class Grocery_WishlistView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request):
-        """
-        Remove a product from the wishlist.
-        """
+
         user = request.user
         product_id = request.data.get('product_id')
 
@@ -99,9 +93,7 @@ class DeleteGroceryProductReviewView(APIView):
         return Response({"message": "Review deleted successfully."}, status=status.HTTP_200_OK)
 
 class GroceryProductReviewListView(generics.ListAPIView):
-    """
-    List all reviews for grocery products.
-    """
+
     queryset = GroceryProductReview.objects.all()
     serializer_class = GroceryProductReviewSerializer
     permission_classes = [IsAuthenticated]

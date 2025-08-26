@@ -138,15 +138,10 @@ class SearchView(APIView):
     def get(self, request):
         query = request.query_params.get('q', '').strip()
 
-        # Search Categories
         categories = Category.objects.filter(name__icontains=query, is_active=True)
         categories_data = ClothingCategorySerializer(categories, many=True).data
-
-        # Search Subcategories
         subcategories = SubCategory.objects.filter(name__icontains=query, is_active=True)
         subcategories_data = SubCategorySerializer(subcategories, many=True).data
-
-        # Search Products
         products = Clothing.objects.filter(name__icontains=query, is_active=True)
         products_data = ClothingSerializer(products, many=True).data
 

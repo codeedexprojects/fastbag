@@ -84,13 +84,10 @@ class ReviewListView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        # Query parameters
         review_type = request.query_params.get('review_type', None)
         
-        # Initialize response data
         data = {}
 
-        # Fetch and serialize reviews for specific types or all
         if review_type == 'dish':
             reviews = DishReview.objects.all()
             serializer = DishReviewSerializer(reviews, many=True)
@@ -146,7 +143,7 @@ class RemoveFavoriteVendorView(generics.DestroyAPIView):
 
 class ListFavoriteVendorsView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = FavoriteVendorSerializer  # ← use the correct serializer
+    serializer_class = FavoriteVendorSerializer 
 
     def get_queryset(self):
         return FavoriteVendor.objects.filter(user=self.request.user)
