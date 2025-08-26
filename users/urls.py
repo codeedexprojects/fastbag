@@ -53,18 +53,14 @@ urlpatterns = [
     path('admin-notifications/unread_count/',
     AdminNotificationViewSet.as_view({'get': 'unread_count'}),name='admin-notification-unread-count'),
     # Mark all read
-    path('admin-notifications/mark_all_read/',
-         AdminNotificationViewSet.as_view({'post': 'mark_all_read'}),
-         name='admin-notification-mark-all-read'),
+    path('admin-notifications/mark_all_read/',AdminNotificationViewSet.as_view({'post': 'mark_all_read'}),name='admin-notification-mark-all-read'),
     # Notification detail
     path('admin-notifications/<int:pk>/',
          AdminNotificationViewSet.as_view({
              'get': 'retrieve',
              'put': 'update',
              'patch': 'partial_update',
-             'delete': 'destroy'
-         }),
-         name='admin-notification-detail'),
+             'delete': 'destroy'}),name='admin-notification-detail'),
     # Mark single read
     path('admin-notifications/<int:pk>/mark_read/',
          AdminNotificationViewSet.as_view({'post': 'mark_read'}),

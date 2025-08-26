@@ -127,18 +127,12 @@ class DishAddonImage(models.Model):
         return self.name
     
     def save(self, *args, **kwargs):
-        """
-        Override the save method to automatically calculate the offer price
-        based on the discount percentage.
-        """
+       
         self.calculate_offer_price()
         super().save(*args, **kwargs)
 
     
     def calculate_offer_price(self):
-        """
-        Automatically calculate the offer price based on the discount percentage.
-        """
         if self.discount and self.price:
             discount_amount = (self.discount / 100) * self.price
             self.offer_price = self.price - discount_amount

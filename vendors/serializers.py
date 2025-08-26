@@ -26,7 +26,7 @@ class VendorCreateSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','id_proof'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','id_proof','passbook_image'
         ]
         
 
@@ -308,3 +308,13 @@ class AppCarouselSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppCarousel
         fields = ['id','vendor','vendor_name','title','ads_image','created_at']
+
+class AppCarouselSerializerByLoc(serializers.ModelSerializer):
+    distance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AppCarouselByLocation
+        fields = ['id', 'vendor', 'title', 'ads_image', 'latitude', 'longitude', 'created_at', 'distance']
+
+    def get_distance(self, obj):
+        return getattr(obj, 'distance', None)
