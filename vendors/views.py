@@ -1150,7 +1150,6 @@ class AppCarouselListViewUser(generics.ListAPIView):
             return qs.filter(vendor_id=vendor_id)
         return qs
 
-
 #create loc based ads 
 class AdsCarouselListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminUser]
