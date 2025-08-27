@@ -159,10 +159,6 @@ class ProductsBySubcategoryView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
-
-
 class UnifiedWishlistView(generics.ListCreateAPIView):
     serializer_class = UnifiedWishlistSerializer
     permission_classes = [IsAuthenticated]  
@@ -204,7 +200,6 @@ class SubCategoriesByVendorAPIView(APIView):
 
         return paginator.get_paginated_response(serialized.data)
 
-
 #Big buy
 class BigBuyOrderCreateView(generics.CreateAPIView):
     queryset = BigBuyOrder.objects.all()
@@ -228,20 +223,17 @@ class BigBuyOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return BigBuyOrder.objects.filter(user=self.request.user)
 
-
 #  Admin: List all Big Buy orders
 class AdminBigBuyOrderListView(generics.ListAPIView):
     queryset = BigBuyOrder.objects.all().order_by('-created_at')
     serializer_class = BigBuyOrderSerializer
     permission_classes = [IsAdminUser]
 
-
 # Retrieve a specific Big Buy order
 class AdminBigBuyOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = BigBuyOrder.objects.all()
     serializer_class = BigBuyOrderSerializer
     permission_classes = [IsAdminUser]
-
 
 #  Update a specific Big Buy order (e.g., status)
 class AdminBigBuyOrderUpdateView(generics.UpdateAPIView):
