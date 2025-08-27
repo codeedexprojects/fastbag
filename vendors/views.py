@@ -1139,14 +1139,17 @@ class AppCarouselDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class AppCarouselListViewUser(generics.ListAPIView):
     permission_classes = []
-    queryset = AppCarousel.objects.all()
     serializer_class = AppCarouselSerializer
-    pagination_class =None
+    pagination_class = None
+    queryset = AppCarousel.objects.all()
+
     def get_queryset(self):
         vendor_id = self.request.query_params.get('vendor_id')
+        qs = super().get_queryset()  
         if vendor_id:
-            return self.queryset.filter(vendor_id=vendor_id)
-        return self.queryset
+            return qs.filter(vendor_id=vendor_id)
+        return qs
+
 
 #create loc based ads 
 class AdsCarouselListCreateView(generics.ListCreateAPIView):
@@ -1195,7 +1198,6 @@ class AdsCarouselListViewUserLoc(generics.ListAPIView):
         a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return R * c
-
 
  
 class VendorByCategoryLocationView(APIView):
