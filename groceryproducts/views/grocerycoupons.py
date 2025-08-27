@@ -55,9 +55,6 @@ class GroceryCouponUsageListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        Filter the queryset to only include coupon usages for the current user.
-        """
         return GroceryCouponUsage.objects.filter(user=self.request.user)
     
 class GroceryCouponUpdateView(generics.RetrieveUpdateDestroyAPIView):
@@ -67,9 +64,6 @@ class GroceryCouponUpdateView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
 
     def get_queryset(self):
-        """
-        Optionally filter the queryset if needed, e.g., admin-only updates.
-        """
         return super().get_queryset()
     
     
