@@ -123,7 +123,7 @@ class ClothingSerializer(serializers.ModelSerializer):
             'id', 'vendor', 'category', 'category_id', 'subcategory', 'subcategory_id',
             'name', 'description', 'gender', 'price', 'discount', 'offer_price','wholesale_price',
             'total_stock', 'colors', 'material', 'images', 'image_files', 'is_active','subcategoryid','categoryid',
-            'created_at', 'updated_at','store_type'
+            'created_at', 'updated_at','store_type','is_offer_Product'
         ]
         read_only_fields = ['total_stock', 'offer_price']
 
