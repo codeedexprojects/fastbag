@@ -79,6 +79,12 @@ class ClothingDetailViewUser(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = []
     parser_classes = [MultiPartParser, FormParser]
 
+class OfferProductsViewfashion(generics.ListAPIView):
+    serializer_class = ClothingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Clothing.objects.filter(is_offer_Product=True, is_active=True, is_available=True)
 
 class ClothingImageListCreateViewVendor(generics.ListCreateAPIView):
     queryset = ClothingImage.objects.all()

@@ -1,5 +1,5 @@
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny,IsAuthenticated
+from rest_framework.permissions import AllowAny,IsAuthenticated
 from users.models import Coupon
 from users.serializers import CouponSerializer
 from vendors.models import Vendor
@@ -24,8 +24,6 @@ class CouponCreateView(APIView):
             serializer.save(vendor=vendor, created_by=request.user)
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
-
-
 
 class CouponRetrieveAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Coupon.objects.all()

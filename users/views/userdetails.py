@@ -5,14 +5,11 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from users.serializers import *
 from users.utils import send_otp_2factor
-from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from datetime import timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import AuthenticationFailed
-from django.utils import timezone
 from users.models import Address
 from users.serializers import AddressSerializer
 from rest_framework import generics

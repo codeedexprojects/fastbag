@@ -63,4 +63,6 @@ urlpatterns = [
     path('clothing-products/count/', ClothingProductCountView.as_view(), name='clothing-product-count'),
     #sub cat by cat
     path('subcategories/by-category/<int:category_id>/', ClothingSubCategoryListByCategory.as_view(), name='subcategory-by-category'),
+    path("fashion/offer-products/", OfferProductsViewfashion.as_view(), name="offer-products"),
+
 ]

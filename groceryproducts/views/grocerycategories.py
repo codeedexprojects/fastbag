@@ -38,7 +38,6 @@ class GroceryCategoryListView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class Gro_CategoryListView(generics.ListAPIView):
     queryset = Category.objects.all()
     serializer_class = GroceryCategorySerializer  
