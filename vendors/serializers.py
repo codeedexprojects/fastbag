@@ -76,7 +76,7 @@ class VendorDetailSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite','id_proof'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite','id_proof','is_fashion'
         ]
 
     def get_fssai_certificate(self, obj):
@@ -318,3 +318,22 @@ class AppCarouselSerializerByLoc(serializers.ModelSerializer):
 
     def get_distance(self, obj):
         return getattr(obj, 'distance', None)
+
+
+class VendorVideoSerializer(serializers.ModelSerializer):
+    vendor_name = serializers.CharField(source="vendor.business_name", read_only=True)
+    vendor_logo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VendorVideo
+        fields = [
+            "id", "vendor", "vendor_name", "title", "description",
+            "video", "thumbnail", "is_active", "created_at", "vendor_logo"
+        ]
+        read_only_fields = ["id", "created_at", "vendor_name"]
+
+    def get_vendor_logo(self, obj):
+        request = self.context.get("request")
+        if obj.vendor.store_logo and request:
+            return request.build_absolute_uri(obj.vendor.store_logo.url)
+        return None

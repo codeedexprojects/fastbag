@@ -84,7 +84,7 @@ class OfferProductsViewfashion(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Clothing.objects.filter(is_offer_Product=True, is_active=True, is_available=True)
+        return Clothing.objects.filter(is_offer_product=True, is_active=True, is_available=True)
 
 class ClothingImageListCreateViewVendor(generics.ListCreateAPIView):
     queryset = ClothingImage.objects.all()

@@ -99,5 +99,9 @@ urlpatterns = [
     path('app-carousel/<int:pk>/', AppCarouselDetailView.as_view(), name='app-carousel-detail'),
     path('vendors/category/<int:category_id>/', VendorByCategoryLocationView.as_view(), name='vendors-by-category-location'),
 
+    path("vendor-videos/", VendorVideoListCreateView.as_view(), name="vendorvideo-list-create"),
+    path("vendor-videos/<int:pk>/", VendorVideoDetailView.as_view(), name="vendorvideo-detail"),
+    path("vendor/video-list/", VendorVideoListView.as_view(), name="vendor-video-list"),
+    path("vendors-products/<int:vendor_id>/", VendorProductsView.as_view(), name="vendor-products"),
 
 ]

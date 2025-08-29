@@ -46,6 +46,7 @@ class  Vendor(models.Model):
     is_approved = models.BooleanField(default=False)
     is_restaurent = models.BooleanField(default=False)
     is_Grocery = models.BooleanField(default=False)
+    is_fashion = models.BooleanField(default=False)
     alternate_email = models.EmailField(null=True, blank=True, unique=True)
     otp_expiry = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
@@ -186,3 +187,22 @@ class AppCarouselByLocation(models.Model):
     latitude = models.FloatField(null=True, blank=True)   
     longitude = models.FloatField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
+
+class VendorVideo(models.Model):
+    vendor = models.ForeignKey(
+        Vendor, 
+        on_delete=models.CASCADE, 
+        related_name="videos"
+    )
+    title = models.CharField(max_length=255, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    video = models.FileField(upload_to="vendor_videos/")  
+    thumbnail = models.ImageField(upload_to="vendor_video_thumbnails/", null=True, blank=True)  
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.vendor.business_name} - {self.title or 'Video'}"
