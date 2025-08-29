@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from deliverypartner.models import DeliveryBoy,OrderAssign,DeliveryNotification
+
 class DeliveryBoySerializer(serializers.ModelSerializer):
     class Meta:
         model = DeliveryBoy

@@ -1264,3 +1264,81 @@ class VendorByCategoryLocationView(APIView):
         a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return R * c
+    
+# List + Create (Admin or Vendor)
+class VendorVideoListCreateView(generics.ListCreateAPIView):
+    queryset = VendorVideo.objects.all()
+    serializer_class = VendorVideoSerializer
+    permission_classes = [IsAuthenticated]  
+    authentication_classes = [VendorJWTAuthentication]
+
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get("vendor_id")
+        if vendor_id:
+            return self.queryset.filter(vendor_id=vendor_id, is_active=True)
+        return self.queryset.filter(is_active=True)
+
+    def perform_create(self, serializer):
+        serializer.save()
+        
+
+# Retrieve + Update + Delete (Admin/Vendor only)
+class VendorVideoDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = VendorVideo.objects.all()
+    serializer_class = VendorVideoSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [VendorJWTAuthentication]
+
+
+class VendorVideoListView(generics.ListAPIView):
+    serializer_class = VendorVideoSerializer
+    permission_classes = [AllowAny]   
+    pagination_class = None           
+
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get("vendor_id")
+        qs = VendorVideo.objects.filter(is_active=True)
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
+        return qs
+    
+class VendorProductsView(APIView):
+    permission_classes = [AllowAny]
+    pagination_class = CustomPageNumberPagination 
+
+    def get(self, request, vendor_id):
+        try:
+            vendor = Vendor.objects.get(id=vendor_id)
+        except Vendor.DoesNotExist:
+            return Response({"error": "Vendor not found"}, status=404)
+
+        queryset = None
+        serializer_class = None
+        store_type = None
+
+        if vendor.is_restaurent:
+            queryset = vendor.dishes.all()
+            serializer_class = DishCreateSerializer
+            store_type = "restaurant"
+
+        elif vendor.is_Grocery:
+            queryset = vendor.grocery.all()
+            serializer_class = GroceryProductSerializer
+            store_type = "grocery"
+
+        elif vendor.is_fashion:
+            queryset = vendor.clothing.all()
+            serializer_class = ClothingSerializer
+            store_type = "fashion"
+
+        else:
+            return Response({"error": "Vendor store type not defined"}, status=400)
+
+        paginator = self.pagination_class()
+        paginated_qs = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = serializer_class(paginated_qs, many=True, context={"request": request})
+        return paginator.get_paginated_response({
+            "store_type": store_type,
+            "products": serializer.data
+        })
+
