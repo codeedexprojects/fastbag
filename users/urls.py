@@ -97,5 +97,6 @@ urlpatterns = [
     path('user-location/create/', UserLocationCreateView.as_view(), name='user-location-create'),
     path('user-location/update/<int:pk>/', UserLocationUpdateView.as_view(), name='user-location-update'),
     path('admin/users/<int:user_id>/addresses/<int:address_id>/',AdminUserAddressUpdateView.as_view(),name='admin-user-address-update'),
+    path('wishlist/', UserWishlistView.as_view(), name='wishlist-list'),
 
 ] 

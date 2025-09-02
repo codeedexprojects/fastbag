@@ -1199,11 +1199,12 @@ class AdsCarouselListViewUserLoc(generics.ListAPIView):
         return R * c
 
  
-class VendorByCategoryLocationView(APIView):
+from django.utils import timezone
+import pytz
 
+class VendorByCategoryLocationView(APIView):
     def get(self, request, category_id):
         category = get_object_or_404(Category, id=category_id)
-
         try:
             user_lat = float(request.query_params.get("lat"))
             user_lon = float(request.query_params.get("lon"))
@@ -1212,34 +1213,56 @@ class VendorByCategoryLocationView(APIView):
                 {"error": "lat and lon query parameters are required and must be numbers."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         if abs(user_lat) > 90 or abs(user_lon) > 180:
             user_lat = user_lat / 10000.0
             user_lon = user_lon / 10000.0
-
         if not (-90 <= user_lat <= 90 and -180 <= user_lon <= 180):
             return Response({"error": "Invalid latitude/longitude values."}, status=400)
-
+        
         vendors = Vendor.objects.filter(
             store_type=category.store_type,
             is_active=True,
             is_approved=True
         ).exclude(latitude__isnull=True, longitude__isnull=True)
-
+        
+        user_favourites = set()
+        if request.user.is_authenticated:
+            user_favourites = set(
+                FavoriteVendor.objects.filter(user=request.user)
+                .values_list('vendor_id', flat=True)
+            )
+        
         vendor_list = []
+        kolkata_tz = pytz.timezone('Asia/Kolkata')
+        
         for vendor in vendors:
             try:
                 v_lat = float(vendor.latitude)
                 v_lon = float(vendor.longitude)
             except (TypeError, ValueError):
                 continue
-
             if not (-90 <= v_lat <= 90 and -180 <= v_lon <= 180):
                 continue
-
+            
             distance = self.haversine(user_lat, user_lon, v_lat, v_lon)
-
             if distance <= 16:
+                opening_time_str = None
+                closing_time_str = None
+                
+                if vendor.opening_time:
+                    today = timezone.now().date()
+                    opening_datetime = timezone.datetime.combine(today, vendor.opening_time)
+                    opening_datetime = timezone.make_aware(opening_datetime, kolkata_tz)
+                    opening_time_str = opening_datetime.strftime('%I:%M %p')
+                
+                if vendor.closing_time:
+                    today = timezone.now().date()
+                    closing_datetime = timezone.datetime.combine(today, vendor.closing_time)
+                    closing_datetime = timezone.make_aware(closing_datetime, kolkata_tz)
+                    closing_time_str = closing_datetime.strftime('%I:%M %p')
+                
+                is_favourite = vendor.id in user_favourites if request.user.is_authenticated else False
+                
                 vendor_list.append({
                     "id": vendor.id,
                     "business_name": vendor.business_name,
@@ -1249,14 +1272,17 @@ class VendorByCategoryLocationView(APIView):
                     "city": vendor.city,
                     "state": vendor.state,
                     "pincode": vendor.pincode,
-                    "distance_km": round(distance, 2)
+                    "distance_km": round(distance, 2),
+                    "opening_time": opening_time_str,
+                    "closing_time": closing_time_str,
+                    "is_favourite": is_favourite
                 })
-
+        
         vendor_list.sort(key=lambda x: x["distance_km"])
-
         return Response(vendor_list)
-
+    
     def haversine(self, lat1, lon1, lat2, lon2):
+        from math import radians, sin, cos, sqrt, atan2
         R = 6371  
         lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
         dlat = lat2 - lat1

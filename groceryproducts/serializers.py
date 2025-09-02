@@ -56,16 +56,16 @@ class GroceryProductSerializer(serializers.ModelSerializer):
     offer_price = serializers.ReadOnlyField()
     discount = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
     weights = serializers.JSONField()
-    store_type = serializers.CharField(source='vendor.store_type.name',read_only=True)
+    store_type = serializers.CharField(source='vendor.store_type.name', read_only=True)
+    is_wishlisted = serializers.SerializerMethodField()
 
-    
     class Meta:
         model = GroceryProducts
         fields = [
             'id', 'category', 'category_name', 'subcategory', 'vendor', 'sub_category_name', 'name', 'price',
             'offer_price', 'discount', 'description', 'weight_measurement',
             'price_for_selected_weight', 'is_offer_product', 'is_popular_product', 'weights',
-            'is_available', 'created_at', 'images','store_type'
+            'is_available', 'created_at', 'images', 'store_type', 'is_wishlisted'
         ]
 
     def get_category_name(self, obj):
@@ -79,6 +79,12 @@ class GroceryProductSerializer(serializers.ModelSerializer):
         if selected_weight:
             return obj.get_price_for_weight(selected_weight)
         return obj.price
+
+    def get_is_wishlisted(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Grocery_Wishlist.objects.filter(user=request.user, product=obj).exists()
+        return False
 
     def create(self, validated_data):
         images_data = validated_data.pop('images', [])
@@ -99,6 +105,7 @@ class GroceryProductSerializer(serializers.ModelSerializer):
             for image_data in images_data:
                 GroceryProductImage.objects.create(product=instance, **image_data)
         return instance
+
     
 
 
@@ -109,10 +116,11 @@ class GroceryWishlistSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name',read_only=True)
     price = serializers.CharField(source='product.offer_price',read_only=True)
     description = serializers.CharField(source='product.description',read_only=True)
+    product_details = GroceryProductSerializer(source='product',read_only=True)
 
     class Meta:
         model = Grocery_Wishlist
-        fields = ['id', 'user', 'product', 'added_at','product_name','price','description']
+        fields = ['id', 'user', 'product', 'added_at','product_name','price','description','product_details']
         read_only_fields = ['id', 'added_at'] 
 
 class GroceryProductReviewSerializer(serializers.ModelSerializer):
