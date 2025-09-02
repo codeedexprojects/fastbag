@@ -76,7 +76,7 @@ class VendorDetailSerializer(serializers.ModelSerializer):
             'business_landmark', 'contact_number', 'address', 'city', 'state', 'pincode',
             'fssai_no', 'fssai_certificate', 'store_logo', 'display_image', 'store_description',
             'store_type','store_type_name', 'opening_time', 'closing_time', 'license', 'is_approved', 
-            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite','id_proof','is_fashion'
+            'is_active', 'created_at', 'is_restaurent', 'is_Grocery','alternate_email','since','longitude','latitude','is_closed','is_favourite','id_proof','is_fashion','commission'
         ]
 
     def get_fssai_certificate(self, obj):

@@ -61,6 +61,8 @@ class  Vendor(models.Model):
     latitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
     longitude = models.DecimalField(max_digits=20, decimal_places=10, null=True, blank=True)  
     is_closed = models.BooleanField(default=False) 
+    commission = models.DecimalField(max_digits=5, decimal_places=2,default=0.00, 
+                                     help_text="Commission percentage for this vendor (e.g., 10.50 means 10.5%)")
 
     def __str__(self):
         return self.business_name
