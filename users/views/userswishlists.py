@@ -122,7 +122,7 @@ class AddFavoriteVendorView(generics.CreateAPIView):
         vendor = serializer.validated_data['vendor']
 
         if FavoriteVendor.objects.filter(user=user, vendor=vendor).exists():
-            raise ValidationError("Vendor is already in your favorites.")
+            raise serializers.ValidationError({"error": "Already in favorites."})
 
         serializer.save(user=user)
 
