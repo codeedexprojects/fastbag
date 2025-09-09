@@ -122,7 +122,7 @@ class AddFavoriteVendorView(generics.CreateAPIView):
         vendor = serializer.validated_data['vendor']
 
         if FavoriteVendor.objects.filter(user=user, vendor=vendor).exists():
-            raise ValidationError("Vendor is already in your favorites.")
+            raise serializers.ValidationError({"error": "Already in favorites."})
 
         serializer.save(user=user)
 
@@ -153,6 +153,30 @@ class ListFavoriteVendorsView(generics.ListAPIView):
         context.update({'request': self.request})
         return context
 
+from rest_framework import status
 
+class UserWishlistView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        user = request.user
+
+        # Fetch wishlists
+        grocery_items = Grocery_Wishlist.objects.filter(user=user)
+        dish_items = Wishlist.objects.filter(user=user)
+        fashion_items = FashionWishlist.objects.filter(user=user)
+
+        # Serialize
+        grocery_data = GroceryWishlistSerializer(grocery_items, many=True).data
+        dish_data = WishlistSerializer(dish_items, many=True).data
+        fashion_data = FashionWishlistSerializer(fashion_items, many=True).data
+
+        # Combine
+        data = {
+            "grocery": grocery_data,
+            "dish": dish_data,
+            "fashion": fashion_data
+        }
+
+        return Response(data, status=status.HTTP_200_OK)
 

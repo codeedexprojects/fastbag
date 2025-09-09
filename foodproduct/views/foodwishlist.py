@@ -18,23 +18,24 @@ class WishlistView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        
         dish_id = request.data.get('dish')
         try:
             dish = Dish.objects.get(id=dish_id)
         except Dish.DoesNotExist:
             return Response({"detail": "Dish not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if the dish is already in the wishlist
         if Wishlist.objects.filter(user=request.user, dish=dish).exists():
             return Response({"detail": "Dish already in the wishlist."}, status=status.HTTP_400_BAD_REQUEST)
 
         wishlist_item = Wishlist.objects.create(user=request.user, dish=dish)
+        
+        dish.is_wishlisted = True
+        dish.save(update_fields=["is_wishlisted"])
+
         serializer = WishlistSerializer(wishlist_item)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request):
-        
         dish_id = request.data.get('dish')
         try:
             dish = Dish.objects.get(id=dish_id)
@@ -44,8 +45,15 @@ class WishlistView(APIView):
         wishlist_item = Wishlist.objects.filter(user=request.user, dish=dish).first()
         if wishlist_item:
             wishlist_item.delete()
+
+            if not Wishlist.objects.filter(dish=dish).exists():
+                dish.is_wishlisted = False
+                dish.save(update_fields=["is_wishlisted"])
+
             return Response({"detail": "Dish removed from wishlist."}, status=status.HTTP_204_NO_CONTENT)
+
         return Response({"detail": "Dish not in the wishlist."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class DishReviewCreateView(APIView):
     permission_classes = [IsAuthenticated]

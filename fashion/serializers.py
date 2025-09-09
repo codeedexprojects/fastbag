@@ -115,7 +115,7 @@ class ClothingSerializer(serializers.ModelSerializer):
     categoryid = serializers.PrimaryKeyRelatedField(source='category', read_only=True)
     subcategoryid = serializers.PrimaryKeyRelatedField(source='subcategory', read_only=True)
     store_type = serializers.CharField(source='vendor.store_type.name',read_only=True)
-    # is_wishlisted = serializers.SerializerMethodField()
+    is_wishlisted = serializers.SerializerMethodField()
 
     class Meta:
         model = Clothing
@@ -123,7 +123,7 @@ class ClothingSerializer(serializers.ModelSerializer):
             'id', 'vendor', 'category', 'category_id', 'subcategory', 'subcategory_id',
             'name', 'description', 'gender', 'price', 'discount', 'offer_price','wholesale_price',
             'total_stock', 'colors', 'material', 'images', 'image_files', 'is_active','subcategoryid','categoryid',
-            'created_at', 'updated_at','store_type','is_offer_product'
+            'created_at', 'updated_at','store_type','is_offer_product','is_wishlisted'
         ]
         read_only_fields = ['total_stock', 'offer_price']
 
@@ -188,10 +188,10 @@ class ClothingSerializer(serializers.ModelSerializer):
 
         return instance
     
-    # def get_is_wishlisted(self, obj):
-    #     request = self.context.get('request')
-    #     if request and request.user.is_authenticated:
-    #         return FashionWishlist.objects.filter(user=request.user, cloth=obj).exists()
+    def get_is_wishlisted(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return FashionWishlist.objects.filter(user=request.user, cloth=obj).exists()
         return False
 
 

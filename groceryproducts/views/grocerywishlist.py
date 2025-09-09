@@ -13,54 +13,49 @@ class Grocery_WishlistView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-
         user = request.user
         wishlist_items = Grocery_Wishlist.objects.filter(user=user)
-        serializer = GroceryWishlistSerializer(wishlist_items, many=True)
+        serializer = GroceryWishlistSerializer(wishlist_items, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-
         user = request.user
         product_id = request.data.get('product_id')
-        
+
         if not product_id:
             return Response({'error': 'Product ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             product = GroceryProducts.objects.get(id=product_id)
         except GroceryProducts.DoesNotExist:
             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if the product is already in the wishlist
         if Grocery_Wishlist.objects.filter(user=user, product=product).exists():
             return Response({'message': 'Product is already in the wishlist'}, status=status.HTTP_200_OK)
-        
-        # Add the product to the wishlist
+
         wishlist_item = Grocery_Wishlist.objects.create(user=user, product=product)
-        serializer = GroceryWishlistSerializer(wishlist_item)
+        serializer = GroceryWishlistSerializer(wishlist_item, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request):
-
         user = request.user
         product_id = request.data.get('product_id')
 
         if not product_id:
             return Response({'error': 'Product ID is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             product = GroceryProducts.objects.get(id=product_id)
         except GroceryProducts.DoesNotExist:
             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Check if the product exists in the user's wishlist
+
         wishlist_item = Grocery_Wishlist.objects.filter(user=user, product=product).first()
         if not wishlist_item:
             return Response({'error': 'Product not in wishlist'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         wishlist_item.delete()
         return Response({'message': 'Product removed from wishlist'}, status=status.HTTP_200_OK)
+
     
 class AddGroceryProductReviewView(APIView):
     permission_classes = [IsAuthenticated]

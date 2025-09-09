@@ -59,6 +59,7 @@ class DishCreateSerializer(serializers.ModelSerializer):
     )
     images = serializers.SerializerMethodField()
     store_type = serializers.CharField(source='vendor.store_type.name', read_only=True)
+    is_wishlisted = serializers.SerializerMethodField()
 
     class Meta:
         model = Dish
@@ -66,7 +67,7 @@ class DishCreateSerializer(serializers.ModelSerializer):
                   'subcategory', 'subcategory_name', 'name', 'description', 'price',
                   'wholesale_price', 'offer_price', 'variants', 'discount',
                   'is_available', 'images', 'image_files', 'is_popular_product',
-                  'is_offer_product', 'is_available', 'store_type','is_veg']
+                  'is_offer_product', 'is_available', 'store_type','is_veg','is_wishlisted']
 
     def create(self, validated_data):
         image_files = validated_data.pop('image_files', [])
@@ -93,7 +94,12 @@ class DishCreateSerializer(serializers.ModelSerializer):
     def get_images(self, obj):
         request = self.context.get('request')
         return DishImageSerializer(obj.images.all(), many=True, context={'request': request}).data
-
+    
+    def get_is_wishlisted(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Wishlist.objects.filter(user=request.user, dish=obj).exists()
+        return False
     
 class Dishlistserializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source='vendor.business_name',read_only=True)
@@ -105,7 +111,7 @@ class Dishlistserializer(serializers.ModelSerializer):
         model = Dish
         fields = ['id','vendor','vendor_name','category','category_name','subcategory','subcategory_name', 'name', 'description', 'price',
                   'offer_price', 'discount', 'is_available', 'images', 'image_urls', 'is_popular_product',
-                  'is_offer_product', 'is_available','is_veg']
+                  'is_offer_product', 'is_available','is_veg','is_wishlisted']
 
 
 class ProductSearchSerializer(serializers.Serializer):
@@ -159,14 +165,30 @@ class DishAddOnSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'price','description','offer_price','discount','images', 'image_urls','is_offer_product','is_popular_product','is_available','created_at']
 
 class WishlistSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='dish.name',read_only=True)
-    price = serializers.CharField(source='dish.offer_price',read_only=True)
-    description = serializers.CharField(source='dish.description',read_only=True)
+    product_name = serializers.CharField(source='dish.name', read_only=True)
+    price = serializers.CharField(source='dish.offer_price', read_only=True)
+    description = serializers.CharField(source='dish.description', read_only=True)
+    Wishlisted = serializers.SerializerMethodField()
+    dish_detail = DishCreateSerializer(source='dish',read_only=True)
 
     class Meta:
         model = Wishlist
-        fields = ['id', 'user', 'dish', 'added_at','product_name','price','description']
-        read_only_fields = ['id', 'added_at']  
+        fields = [
+            'id',
+            'user',
+            'dish',
+            'added_at',
+            'product_name',
+            'price',
+            'description',
+            'Wishlisted',
+            'dish_detail'
+        ]
+        read_only_fields = ['id', 'added_at']
+
+    def get_Wishlisted(self, obj):
+        return True
+ 
 
 class DishReviewSerializer(serializers.ModelSerializer):
     dish_name = serializers.CharField(source='dish.name',read_only=True)

@@ -42,6 +42,8 @@ class Dish(models.Model):
     is_popular_product = models.BooleanField(default=False)
     variants = models.JSONField(default=list,help_text="Store different variants (name, price, stock status) as a dictionary")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_wishlisted = models.BooleanField(default=False)
+
 
     def __str__(self):
         return self.name
@@ -115,6 +117,7 @@ class DishAddOn(models.Model):
     is_offer_product = models.BooleanField(default=False)
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 class DishAddonImage(models.Model):
     dish_addon = models.ForeignKey(DishAddOn, on_delete=models.CASCADE, related_name='addon_images')

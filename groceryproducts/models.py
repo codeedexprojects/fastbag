@@ -42,6 +42,8 @@ class GroceryProducts(models.Model):
     is_popular_product = models.BooleanField(default=False)
     weights = models.JSONField(default=list,help_text="Store different weights with their respective prices, quantities, and stock status as a dictionary")
     created_at = models.DateTimeField(auto_now_add=True, null=True)
+    is_wishlisted = models.BooleanField(default=False)
+
 
     def calculate_offer_price(self):
         
