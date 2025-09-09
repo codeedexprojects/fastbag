@@ -1328,6 +1328,45 @@ class VendorVideoListView(generics.ListAPIView):
             qs = qs.filter(vendor_id=vendor_id)
         return qs
     
+# ---------------------------------------------------------------------------------------------------------------------
+#list only stories for 24 hrs
+
+# class VendorVideoListView(generics.ListAPIView):
+#     serializer_class = VendorVideoSerializer
+#     permission_classes = [AllowAny]   
+#     pagination_class = None           
+
+#     def get_queryset(self):
+#         vendor_id = self.request.query_params.get("vendor_id")
+#         last_24_hours = timezone.now() - timedelta(hours=24)
+
+#         qs = VendorVideo.objects.filter(is_active=True, created_at__gte=last_24_hours)
+#         if vendor_id:
+#             qs = qs.filter(vendor_id=vendor_id)
+#         return qs
+
+# ---------------------------------------------------------------------------------------
+#delt by 48 hrs and show only for 24 hrs
+
+# class VendorVideoListView(generics.ListAPIView):
+#     serializer_class = VendorVideoSerializer
+#     permission_classes = [AllowAny]   
+#     pagination_class = None           
+
+#     def get_queryset(self):
+#         vendor_id = self.request.query_params.get("vendor_id")
+#         now = timezone.now()
+
+#         # Delete videos older than 48 hours
+#         VendorVideo.objects.filter(created_at__lt=now - timedelta(hours=48)).delete()
+
+#         # Show only last 24 hours
+#         qs = VendorVideo.objects.filter(is_active=True, created_at__gte=now - timedelta(hours=24))
+#         if vendor_id:
+#             qs = qs.filter(vendor_id=vendor_id)
+#         return qs
+
+# ------------------------------------------------------------------------------------------------------------------------------ 
 class VendorProductsView(APIView):
     permission_classes = [AllowAny]
     pagination_class = CustomPageNumberPagination 
@@ -1368,3 +1407,56 @@ class VendorProductsView(APIView):
             "products": serializer.data
         })
 
+class NearbyRestaurantsAPIView(generics.ListAPIView):
+    serializer_class = VendorDetailSerializer
+    permission_classes = [AllowAny]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        latitude = self.request.query_params.get("latitude")
+        longitude = self.request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Vendor.objects.none()
+
+        try:
+            user_lat = Decimal(latitude)
+            user_long = Decimal(longitude)
+        except InvalidOperation:
+            return Vendor.objects.none()
+
+        user_location = (user_lat, user_long)
+
+        nearby_restaurants = []
+        for vendor in Vendor.objects.filter(
+            latitude__isnull=False,
+            longitude__isnull=False,
+            is_restaurent=True,  
+        ):
+            vendor_location = (vendor.latitude, vendor.longitude)
+            dist = geopy_distance(user_location, vendor_location).km
+            if dist <= 20:  
+                nearby_restaurants.append(vendor.id)
+
+        return Vendor.objects.filter(id__in=nearby_restaurants)
+
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get("latitude")
+        longitude = request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Response(
+                {"error": "Both latitude and longitude query parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            Decimal(latitude)
+            Decimal(longitude)
+        except InvalidOperation:
+            return Response(
+                {"error": "Invalid latitude or longitude values."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().list(request, *args, **kwargs)

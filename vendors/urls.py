@@ -103,5 +103,5 @@ urlpatterns = [
     path("vendor-videos/<int:pk>/", VendorVideoDetailView.as_view(), name="vendorvideo-detail"),
     path("vendor/video-list/", VendorVideoListView.as_view(), name="vendor-video-list"),
     path("vendors-products/<int:vendor_id>/", VendorProductsView.as_view(), name="vendor-products"),
-
+    path("popular-restaurents/",NearbyRestaurantsAPIView.as_view(),name="nearby-restaurants",),
 ]
