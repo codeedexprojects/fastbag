@@ -100,7 +100,6 @@ class Checkout(models.Model):
         self.save()
 
     def apply_coupon(self, coupon):
-        """Applies a coupon and calculates discount."""
         if coupon:
             if coupon.discount_type == 'percentage':
                 discount = (self.total_amount * coupon.discount_value) / 100

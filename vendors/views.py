@@ -1460,3 +1460,56 @@ class NearbyRestaurantsAPIView(generics.ListAPIView):
             )
 
         return super().list(request, *args, **kwargs)
+
+from django.db.models import Sum, F
+
+from django.utils import timezone
+from django.db.models import Sum, F
+from decimal import Decimal
+
+class VendorCommissionAPIView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        today = timezone.now().date()
+
+        paid_items = CheckoutItem.objects.filter(
+            checkout__order__payment_status="paid"
+        ).select_related("vendor", "checkout__order")
+
+        vendors = Vendor.objects.filter(
+            id__in=paid_items.values_list("vendor_id", flat=True)
+        )
+
+        for vendor in vendors:
+            total_sales = paid_items.filter(vendor=vendor).aggregate(
+                total=Sum(F("price") * F("quantity"))
+            )["total"] or Decimal("0.00")
+
+            commission_percentage = vendor.commission or Decimal("0.00")
+            commission_amount = (total_sales * commission_percentage) / Decimal("100")
+
+            commission_record = VendorCommission.objects.filter(
+                vendor=vendor,
+                created_at__date=today
+            ).first()
+
+            if commission_record:
+                commission_record.total_sales = total_sales
+                commission_record.commission_percentage = commission_percentage
+                commission_record.commission_amount = commission_amount
+                commission_record.save()
+            else:
+                commission_record = VendorCommission.objects.create(
+                    vendor=vendor,
+                    total_sales=total_sales,
+                    commission_percentage=commission_percentage,
+                    commission_amount=commission_amount,
+                )
+
+        commissions = VendorCommission.objects.filter(created_at__date=today).select_related("vendor")
+
+        serializer = VendorCommissionSerializer(
+            commissions, many=True, context={"request": request}
+        )
+        return Response(serializer.data)

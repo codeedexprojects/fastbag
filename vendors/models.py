@@ -208,3 +208,17 @@ class VendorVideo(models.Model):
 
     def __str__(self):
         return f"{self.vendor.business_name} - {self.title or 'Video'}"
+    
+from decimal import Decimal
+class VendorCommission(models.Model):
+    vendor = models.ForeignKey("Vendor", on_delete=models.CASCADE, related_name="commissions")
+    total_sales = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.vendor.business_name} - {self.commission_amount} ({self.generated_at.date()})"

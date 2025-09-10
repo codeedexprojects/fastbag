@@ -144,7 +144,7 @@ class VendorPendingDetailSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor
-        fields = ['id','business_name','','longitude','opening_time','display_image','is_closed']
+        fields = ['id','business_name','longitude','opening_time','display_image','is_closed']
 
 class VendorHomePageSerializer(serializers.ModelSerializer):
     is_favourite = serializers.SerializerMethodField()
@@ -336,4 +336,31 @@ class VendorVideoSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if obj.vendor.store_logo and request:
             return request.build_absolute_uri(obj.vendor.store_logo.url)
+        return None
+
+class VendorcommissionSerializer(serializers.ModelSerializer):
+    store_type= serializers.CharField(source='store_type.name',read_only=True)
+    class Meta:
+        model = Vendor
+        fields = ['id','business_name','longitude','display_image','is_closed','business_location','contact_number','store_type']
+
+
+class VendorCommissionSerializer(serializers.ModelSerializer):
+    vendor = VendorcommissionSerializer(read_only=True)  
+
+    class Meta:
+        model = VendorCommission
+        fields = [
+            "id",
+            "vendor",
+            "total_sales",
+            "commission_percentage",
+            "commission_amount",
+            "created_at",
+        ]
+
+    def get_display_image(self, obj):
+        request = self.context.get("request")
+        if obj.display_image and request:
+            return request.build_absolute_uri(obj.display_image.url)
         return None

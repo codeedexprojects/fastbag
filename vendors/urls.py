@@ -104,4 +104,7 @@ urlpatterns = [
     path("vendor/video-list/", VendorVideoListView.as_view(), name="vendor-video-list"),
     path("vendors-products/<int:vendor_id>/", VendorProductsView.as_view(), name="vendor-products"),
     path("popular-restaurents/",NearbyRestaurantsAPIView.as_view(),name="nearby-restaurants",),
+    #commission
+    path("admin/vendor-commissions/", VendorCommissionAPIView.as_view(), name="vendor-commissions"),
+
 ]
