@@ -342,7 +342,7 @@ class VendorcommissionSerializer(serializers.ModelSerializer):
     store_type= serializers.CharField(source='store_type.name',read_only=True)
     class Meta:
         model = Vendor
-        fields = ['id','business_name','longitude','display_image','is_closed','business_location','contact_number','store_type']
+        fields = ['id','business_name','display_image','owner_name','business_location','contact_number','store_type']
 
 
 class VendorCommissionSerializer(serializers.ModelSerializer):
