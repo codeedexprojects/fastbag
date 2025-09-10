@@ -3,14 +3,12 @@ import os
 from django.core.files import File
 
 def compress_video(input_path, output_path):
-    """
-    Compress video using ffmpeg.
-    """
+
     command = [
         "ffmpeg",
         "-i", input_path,
         "-vcodec", "libx264",
-        "-crf", "28",  # lower = better quality, bigger file
+        "-crf", "28",  
         "-preset", "veryfast",
         "-movflags", "+faststart",
         output_path
