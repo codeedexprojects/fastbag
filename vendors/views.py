@@ -1037,6 +1037,7 @@ class NearbyVendorsAPIView(generics.ListAPIView):
     
 
 class NearbyVendorCategoriesOnlyAPIView(generics.ListAPIView):
+    permission_classes=[]
     serializer_class = CategorySerializer
     pagination_class = CustomPageNumberPagination
 
@@ -1162,36 +1163,66 @@ class AdsCarouselListCreateView(generics.ListCreateAPIView):
         if vendor_id:
             return self.queryset.filter(vendor_id=vendor_id)
         return self.queryset
+    
+class AdsCarouselDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = AppCarouselByLocation.objects.all()
+    serializer_class = AppCarouselSerializerByLoc
+    lookup_field = "id"     
 
 class AdsCarouselListViewUserLoc(generics.ListAPIView):
     permission_classes = []
     serializer_class = AppCarouselSerializerByLoc
-    pagination_class =None
+    pagination_class = None
 
     def get_queryset(self):
-        queryset = AppCarouselByLocation.objects.all()
-
         user_lat = self.request.query_params.get('lat')
         user_lon = self.request.query_params.get('lon')
 
-        if user_lat and user_lon:
+        if not user_lat or not user_lon:
+            return AppCarouselByLocation.objects.none() 
+
+        try:
             user_lat = float(user_lat)
             user_lon = float(user_lon)
+        except ValueError:
+            return AppCarouselByLocation.objects.none()
 
-            nearby_ads = []
-            for ad in queryset:
-                if ad.latitude and ad.longitude:
-                    distance = self.haversine(user_lat, user_lon, ad.latitude, ad.longitude)
-                    if distance <= 30:  # Only ads within 20km
-                        ad.distance = round(distance, 2) 
-                        nearby_ads.append(ad)
+        queryset = AppCarouselByLocation.objects.all()
+        nearby_ads = []
 
-            return nearby_ads
+        for ad in queryset:
+            if ad.latitude and ad.longitude:
+                distance = self.haversine(user_lat, user_lon, ad.latitude, ad.longitude)
+                if distance <= 20: 
+                    ad.distance = round(distance, 2)
+                    nearby_ads.append(ad)
 
-        return queryset
+        return nearby_ads
+
+    def list(self, request, *args, **kwargs):
+        user_lat = request.query_params.get('lat')
+        user_lon = request.query_params.get('lon')
+
+        if not user_lat or not user_lon:
+            return Response(
+                {"error": "Both 'lat' and 'lon' parameters are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            float(user_lat)
+            float(user_lon)
+        except ValueError:
+            return Response(
+                {"error": "Invalid 'lat' or 'lon' values."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().list(request, *args, **kwargs)
 
     def haversine(self, lat1, lon1, lat2, lon2):
-        R = 6371 
+        R = 6371  
         dlat = radians(lat2 - lat1)
         dlon = radians(lon2 - lon1)
         a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
@@ -1203,6 +1234,7 @@ from django.utils import timezone
 import pytz
 
 class VendorByCategoryLocationView(APIView):
+    permission_classes = []
     def get(self, request, category_id):
         category = get_object_or_404(Category, id=category_id)
         try:
