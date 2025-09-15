@@ -218,7 +218,6 @@ class UserUpdateView(APIView):
         return Response(serializer.data)
 
     def put(self, request):
-        # Pass the request context to the serializer to access 'request'
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()

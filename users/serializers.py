@@ -100,13 +100,12 @@ CustomUser = get_user_model()
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser  
-        fields = ['name', 'email']
+        fields = ['name', 'email','mobile_number']
 
     def validate_email(self, value):
-        # Add custom validation if needed
         user = self.context['request'].user
         if CustomUser.objects.filter(email=value).exclude(id=user.id).exists():
-            raise serializers.ValidationError("This email is already associated with another account.")
+            raise serializers.ValidationError("This email or mobile number is already associated with another account.")
         return value
     
 

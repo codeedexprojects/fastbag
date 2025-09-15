@@ -143,13 +143,53 @@ class DishFilterListView(generics.ListAPIView):
         return queryset
 
 #for listing offer product    
+from geopy.distance import geodesic
+
 class DishOfferProductListView(generics.ListAPIView):
     serializer_class = DishCreateSerializer
-    pagination_class = None
-    permission_classes=[]
+    permission_classes = []
+    pagination_class = CustomPageNumberPagination  
 
     def get_queryset(self):
-        return Dish.objects.filter(is_offer_product=True)
+        latitude = self.request.query_params.get("latitude")
+        longitude = self.request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Dish.objects.none()
+
+        user_location = (float(latitude), float(longitude))
+        nearby_vendors = []
+
+        for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
+            vendor_location = (float(vendor.latitude), float(vendor.longitude))
+            distance_km = geodesic(user_location, vendor_location).km
+            if distance_km <= 20:  
+                nearby_vendors.append(vendor.id)
+
+        return Dish.objects.filter(
+            vendor_id__in=nearby_vendors,
+            is_offer_product=True
+        )
+
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get("latitude")
+        longitude = request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Response(
+                {"error": "Latitude and longitude are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset) 
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
 #for listing popular product    
 class DishPopularProductListView(generics.ListAPIView):

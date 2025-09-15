@@ -1350,15 +1350,53 @@ class VendorVideoDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class VendorVideoListView(generics.ListAPIView):
     serializer_class = VendorVideoSerializer
-    permission_classes = [AllowAny]   
-    pagination_class = None           
+    permission_classes = [AllowAny]
+    pagination_class = CustomPageNumberPagination  
 
     def get_queryset(self):
+        latitude = self.request.query_params.get("latitude")
+        longitude = self.request.query_params.get("longitude")
         vendor_id = self.request.query_params.get("vendor_id")
+
         qs = VendorVideo.objects.filter(is_active=True)
+
         if vendor_id:
-            qs = qs.filter(vendor_id=vendor_id)
-        return qs
+            return qs.filter(vendor_id=vendor_id)
+
+        if not latitude or not longitude:
+            return VendorVideo.objects.none()
+
+        user_location = (float(latitude), float(longitude))
+        nearby_vendors = []
+
+        for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
+            vendor_location = (float(vendor.latitude), float(vendor.longitude))
+            distance_km = geodesic(user_location, vendor_location).km
+            if distance_km <= 10:
+                nearby_vendors.append(vendor.id)
+
+        return qs.filter(vendor_id__in=nearby_vendors)
+
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get("latitude")
+        longitude = request.query_params.get("longitude")
+        vendor_id = request.query_params.get("vendor_id")
+
+        if not vendor_id and (not latitude or not longitude):
+            return Response(
+                {"error": "Either vendor_id or latitude/longitude is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
 # ---------------------------------------------------------------------------------------------------------------------
 #list only stories for 24 hrs
