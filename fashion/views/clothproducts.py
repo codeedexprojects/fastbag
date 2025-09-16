@@ -86,7 +86,6 @@ class OfferProductsViewfashion(generics.ListAPIView):
     permission_classes = []
     pagination_class = CustomPageNumberPagination
 
-
     def get_queryset(self):
         latitude = self.request.query_params.get("latitude")
         longitude = self.request.query_params.get("longitude")
@@ -100,7 +99,7 @@ class OfferProductsViewfashion(generics.ListAPIView):
         for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
             vendor_location = (float(vendor.latitude), float(vendor.longitude))
             distance_km = geodesic(user_location, vendor_location).km
-            if distance_km <= 20:  # within 10km
+            if distance_km <= 20:  # within 20 km
                 nearby_vendors.append(vendor.id)
 
         return Clothing.objects.filter(
@@ -117,10 +116,17 @@ class OfferProductsViewfashion(generics.ListAPIView):
         if not latitude or not longitude:
             return Response(
                 {"error": "Latitude and longitude are required."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)  
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        # Fallback: no pagination
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 

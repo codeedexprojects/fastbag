@@ -1468,13 +1468,17 @@ class VendorProductsView(APIView):
 
         else:
             return Response({"error": "Vendor store type not defined"}, status=400)
+        vendor_data = VendorSerializer(vendor, context={"request": request}).data  
+
 
         paginator = self.pagination_class()
         paginated_qs = paginator.paginate_queryset(queryset, request, view=self)
         serializer = serializer_class(paginated_qs, many=True, context={"request": request})
         return paginator.get_paginated_response({
             "store_type": store_type,
-            "products": serializer.data
+            "products": serializer.data,
+            "vendor": vendor_data,     
+
         })
 
 class NearbyRestaurantsAPIView(generics.ListAPIView):

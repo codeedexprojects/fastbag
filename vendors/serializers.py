@@ -144,7 +144,7 @@ class VendorPendingDetailSerializer(serializers.ModelSerializer):
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor
-        fields = ['id','business_name','longitude','opening_time','display_image','is_closed']
+        fields = ['id','business_name','business_location','longitude','opening_time','display_image','is_closed','closing_time']
 
 class VendorHomePageSerializer(serializers.ModelSerializer):
     is_favourite = serializers.SerializerMethodField()
