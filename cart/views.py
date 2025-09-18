@@ -748,6 +748,7 @@ class GroupedCartView(APIView):
                 grouped_data[vendor_id] = {
                     "vendor_id": item.vendor.id,
                     "vendor_name": item.vendor.business_name,
+                    "store_type" : item.product_type,
                     "vendor_logo": request.build_absolute_uri(item.vendor.store_logo.url) if item.vendor.store_logo else None,
                     "vendor_image": request.build_absolute_uri(item.vendor.display_image.url) if item.vendor.display_image else None,
                     "items": []
