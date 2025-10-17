@@ -10,7 +10,6 @@ from django.core.mail import send_mail
 import random
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
-from users.permissions import IsAdminOrSuperuser
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -33,7 +32,8 @@ from geopy.distance import distance as geopy_distance
 from geopy.distance import geodesic
 from math import radians, sin, cos, sqrt, atan2
 from django.shortcuts import get_object_or_404
-
+from django.db.models import Sum, F
+from decimal import Decimal
 class IsVendor(BasePermission):
    
 
@@ -165,7 +165,7 @@ class VendorListViewAdmin(generics.ListAPIView):
 
 class VendorDetailView(generics.RetrieveUpdateDestroyAPIView):
     authentication_classes = [VendorJWTAuthentication]
-    permission_classes = [IsAuthenticated,IsVendor]
+    permission_classes = [IsAuthenticated]
     # queryset = Vendor.objects.all().order_by('-created_at')
     serializer_class = VendorDetailSerializer
     def get_queryset(self):
@@ -353,7 +353,7 @@ class VendorLoginView(APIView):
         except Exception as e:
             return Response({"error": f"Failed to send OTP: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({"message": "OTP sent successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "OTP sent successfully","otp":vendor_admin.otp}, status=status.HTTP_200_OK)
 
 
 class VendorOTPVerifyView(APIView):
@@ -960,6 +960,24 @@ class ApproveSubCategoryRequestView(APIView):
             return Response({"error": "SubCategoryRequest not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
+class SubCategoryRequestListView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = SubCategoryRequestSerializer
+
+    def get_queryset(self):
+        status_filter = self.request.query_params.get("status")
+
+        queryset = SubCategoryRequest.objects.all().order_by("-id")
+
+        if status_filter == "pending":
+            queryset = queryset.filter(is_approved__isnull=True)
+        elif status_filter == "approved":
+            queryset = queryset.filter(is_approved=True)
+        elif status_filter == "rejected":
+            queryset = queryset.filter(is_approved=False)
+
+        return queryset
+
 
 class SubCategoryListByCategory(generics.ListAPIView):
     serializer_class = SubCategorySerializer
@@ -1054,7 +1072,7 @@ class NearbyVendorCategoriesOnlyAPIView(generics.ListAPIView):
         for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
             vendor_location = (float(vendor.latitude), float(vendor.longitude))
             distance_km = geodesic(user_location, vendor_location).km
-            if distance_km <= 10:
+            if distance_km <= 20:
                 nearby_vendors.append(vendor.id)
 
         grocery_cats = GroceryProducts.objects.filter(vendor_id__in=nearby_vendors).values_list('category_id', flat=True)
@@ -1338,6 +1356,21 @@ class VendorVideoListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save()
+
+
+class VendorVideoListViewAdmin(generics.ListCreateAPIView):
+    queryset = VendorVideo.objects.all()
+    serializer_class = VendorVideoSerializer
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        vendor_id = self.request.query_params.get("vendor_id")
+        if vendor_id:
+            return self.queryset.filter(vendor_id=vendor_id, is_active=True)
+        return self.queryset.filter(is_active=True)
+
+    def perform_create(self, serializer):
+        serializer.save()
         
 
 # Retrieve + Update + Delete (Admin/Vendor only)
@@ -1346,6 +1379,11 @@ class VendorVideoDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = VendorVideoSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [VendorJWTAuthentication]
+
+class VendorVideoDetailViewAdmin(generics.RetrieveUpdateDestroyAPIView):
+    queryset = VendorVideo.objects.all()
+    serializer_class = VendorVideoSerializer
+    permission_classes = [IsAdminUser]
 
 
 class VendorVideoListView(generics.ListAPIView):
@@ -1535,11 +1573,7 @@ class NearbyRestaurantsAPIView(generics.ListAPIView):
 
         return super().list(request, *args, **kwargs)
 
-from django.db.models import Sum, F
 
-from django.utils import timezone
-from django.db.models import Sum, F
-from decimal import Decimal
 
 class VendorCommissionAPIView(APIView):
     permission_classes = [IsAdminUser]
@@ -1547,15 +1581,18 @@ class VendorCommissionAPIView(APIView):
     def get(self, request, *args, **kwargs):
         today = timezone.now().date()
 
+        # Get all paid checkout items
         paid_items = CheckoutItem.objects.filter(
             checkout__order__payment_status="paid"
         ).select_related("vendor", "checkout__order")
 
+        # Vendors who have sales today
         vendors = Vendor.objects.filter(
             id__in=paid_items.values_list("vendor_id", flat=True)
         )
 
         for vendor in vendors:
+            # Calculate today's sales for this vendor
             total_sales = paid_items.filter(vendor=vendor).aggregate(
                 total=Sum(F("price") * F("quantity"))
             )["total"] or Decimal("0.00")
@@ -1563,6 +1600,7 @@ class VendorCommissionAPIView(APIView):
             commission_percentage = vendor.commission or Decimal("0.00")
             commission_amount = (total_sales * commission_percentage) / Decimal("100")
 
+            # Check if record already exists for today
             commission_record = VendorCommission.objects.filter(
                 vendor=vendor,
                 created_at__date=today
@@ -1572,6 +1610,10 @@ class VendorCommissionAPIView(APIView):
                 commission_record.total_sales = total_sales
                 commission_record.commission_percentage = commission_percentage
                 commission_record.commission_amount = commission_amount
+
+                if commission_record.payment_status == "pending" and commission_amount > 0:
+                    commission_record.payment_status = "pending"
+
                 commission_record.save()
             else:
                 commission_record = VendorCommission.objects.create(
@@ -1579,13 +1621,46 @@ class VendorCommissionAPIView(APIView):
                     total_sales=total_sales,
                     commission_percentage=commission_percentage,
                     commission_amount=commission_amount,
+                    payment_status="pending"  
                 )
 
-        commissions = VendorCommission.objects.filter(created_at__date=today).select_related("vendor")
+        commissions = VendorCommission.objects.filter(
+            created_at__date=today
+        ).select_related("vendor")
 
         serializer = VendorCommissionSerializer(
             commissions, many=True, context={"request": request}
         )
         return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+
+        commission_id = request.data.get("commission_id")
+        payment_status = request.data.get("payment_status")
+
+        if not commission_id or not payment_status:
+            return Response(
+                {"detail": "commission_id and payment_status are required"},
+                status=400
+            )
+
+        try:
+            commission = VendorCommission.objects.get(id=commission_id)
+        except VendorCommission.DoesNotExist:
+            return Response({"detail": "Commission not found"}, status=404)
+
+        if payment_status not in dict(VendorCommission.PAYMENT_STATUS_CHOICES):
+            return Response({"detail": "Invalid payment status"}, status=400)
+
+        commission.payment_status = payment_status
+
+        if payment_status == "paid":
+            commission.paid_at = timezone.now()
+        else:
+            commission.paid_at = None
+
+        commission.save()
+
+        return Response({"detail": "Payment status updated successfully"})
     
 

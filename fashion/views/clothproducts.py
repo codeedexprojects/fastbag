@@ -37,7 +37,14 @@ class ClothingListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [VendorJWTAuthentication]
     filter_backends = [SearchFilter]
-    search_fields = ['name']  
+    search_fields = ['name']
+
+    def get_queryset(self):
+        vendor = self.request.user 
+        return Clothing.objects.filter(vendor=vendor)
+
+    def perform_create(self, serializer):
+        serializer.save(vendor=self.request.user)
 
 class ClothingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clothing.objects.all()

@@ -225,14 +225,27 @@ class VendorVideo(models.Model):
     
 from decimal import Decimal
 class VendorCommission(models.Model):
+    PAYMENT_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("paid", "Paid")
+    ]
+
     vendor = models.ForeignKey("Vendor", on_delete=models.CASCADE, related_name="commissions")
     total_sales = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
     commission_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default="pending"
+    )
     created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.vendor.business_name} - {self.commission_amount} ({self.created_at.date()})"
+        return (
+            f"{self.vendor.business_name} - {self.commission_amount} "
+            f"({self.created_at.date()}) - {self.payment_status}"
+        )

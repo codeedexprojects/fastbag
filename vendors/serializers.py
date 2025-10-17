@@ -68,7 +68,9 @@ class VendorDetailSerializer(serializers.ModelSerializer):
     store_logo = serializers.ImageField()
     display_image = serializers.ImageField()
     license = serializers.ImageField()
+    is_favourite = serializers.SerializerMethodField()
     store_type_name = serializers.CharField(source='store_type.name',read_only=True)
+    
     class Meta:
         model = Vendor
         fields = [
@@ -83,6 +85,15 @@ class VendorDetailSerializer(serializers.ModelSerializer):
         if obj.fssai_certificate:
             return self.context['request'].build_absolute_uri(obj.fssai_certificate.url)
         return None
+    
+    def get_is_favourite(self, obj):
+        request = self.context.get('request')
+        user = request.user if request else None
+        if user and user.is_authenticated:
+            from users.models import CustomUser  # Import your user model
+            if isinstance(user, CustomUser):
+                return FavoriteVendor.objects.filter(user=user, vendor=obj).exists()
+        return False
 
     def get_store_logo(self, obj):
         if obj.store_logo:
@@ -98,8 +109,9 @@ class VendorDetailSerializer(serializers.ModelSerializer):
         if obj.license:
             return self.context['request'].build_absolute_uri(obj.license.url)
         return None
+        
     def update(self, instance, validated_data):
-    # Store updates in pending fields
+        # Store updates in pending fields
         if 'contact_number' in validated_data:
             instance.pending_contact_number = validated_data.pop('contact_number')
         if 'fssai_certificate' in validated_data:
@@ -117,7 +129,7 @@ class VendorDetailSerializer(serializers.ModelSerializer):
         return instance
     
     def get_is_closed_now(self, obj):
-        return obj.is_closed_now 
+        return obj.is_closed_now
 
 class VendorfavSerializer(serializers.ModelSerializer):
     opening_time = serializers.SerializerMethodField()
@@ -355,6 +367,7 @@ class VendorCommissionSerializer(serializers.ModelSerializer):
             "vendor",
             "total_sales",
             "commission_percentage",
+            "payment_status",
             "commission_amount",
             "created_at",
         ]
@@ -364,3 +377,13 @@ class VendorCommissionSerializer(serializers.ModelSerializer):
         if obj.display_image and request:
             return request.build_absolute_uri(obj.display_image.url)
         return None
+
+
+class SubCategoryRequestSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    vendor_name = serializers.CharField(source="Vendor.business_name", read_only=True)
+
+
+    class Meta:
+        model = SubCategoryRequest
+        fields = ["id", "category", "category_name", "name", "sub_category_image", "status", "created_at",'vendor','vendor_name']

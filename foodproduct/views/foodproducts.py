@@ -30,6 +30,13 @@ class DishCreateView(generics.ListCreateAPIView):
     authentication_classes = [VendorJWTAuthentication]
     filter_backends = [SearchFilter]
     search_fields = ['name']
+    
+    def get_queryset(self):
+        vendor = self.request.user
+        return Dish.objects.filter(vendor=vendor)
+    
+    def perform_create(self, serializer):
+        serializer.save(vendor=self.request.user)
 
 class DishCreateViewAdmin(generics.ListCreateAPIView):
     queryset = Dish.objects.all()

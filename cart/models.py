@@ -147,6 +147,7 @@ class Order(models.Model):
     ORDER_STATUS_CHOICES = [
         ("pending", "Pending"),
         ("processing", "Processing"),
+        ("Picked", "Picked"),
         ("out for delivery", "Out for Delivery"), 
         ("shipped", "Shipped"),
         ("delivered", "Delivered"),

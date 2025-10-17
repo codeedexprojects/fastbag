@@ -101,11 +101,15 @@ urlpatterns = [
     path('vendors/category/<int:category_id>/', VendorByCategoryLocationView.as_view(), name='vendors-by-category-location'),
 
     path("vendor-videos/", VendorVideoListCreateView.as_view(), name="vendorvideo-list-create"),
+    path("vendor-videos-admin/", VendorVideoListViewAdmin.as_view(), name="vendorvideo-list-admin"),
     path("vendor-videos/<int:pk>/", VendorVideoDetailView.as_view(), name="vendorvideo-detail"),
+    path("vendor-videoadmin/<int:pk>/", VendorVideoDetailViewAdmin.as_view(), name="vendorvideo-detail-admin"),
     path("vendor/video-list/", VendorVideoListView.as_view(), name="vendor-video-list"),
     path("vendors-products/<int:vendor_id>/", VendorProductsView.as_view(), name="vendor-products"),
     path("popular-restaurents/",NearbyRestaurantsAPIView.as_view(),name="nearby-restaurants",),
     #commission
     path("admin/vendor-commissions/", VendorCommissionAPIView.as_view(), name="vendor-commissions"),
+    path("subcategory-requests/", SubCategoryRequestListView.as_view(), name="subcategory-request-list"),
+
 
 ]

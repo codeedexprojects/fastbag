@@ -83,8 +83,14 @@ class GroceryProductSerializer(serializers.ModelSerializer):
     def get_is_wishlisted(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return Grocery_Wishlist.objects.filter(user=request.user, product=obj).exists()
+            try:
+                from users.models import CustomUser
+                if isinstance(request.user, CustomUser):
+                    return Grocery_Wishlist.objects.filter(user=request.user, product=obj).exists()
+            except (ValueError, TypeError):
+                pass
         return False
+
 
     def create(self, validated_data):
         images_data = validated_data.pop('images', [])
