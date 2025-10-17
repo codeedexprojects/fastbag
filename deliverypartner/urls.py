@@ -28,6 +28,7 @@ urlpatterns =[
          UpdateOrderStatusView.as_view(), name='update-order-status'),
     path('delivery-boy/<int:delivery_boy_id>/orders/', DeliveryBoyOrderListView.as_view(), name='delivery-boy-order-list'),
     path('delivery_boys/<int:delivery_boy_id>/accepted_orders/', AcceptedOrderListView.as_view(), name='accepted-orders-list'),
+    path('delivery_boys/<int:delivery_boy_id>/rejected_orders/', RejecteddOrderListView.as_view(), name='rejected-orders-list'),
     path('delivery_boys/<int:delivery_boy_id>/orders/<int:order_id>/reject/', RejectOrderView.as_view(), name='reject-order'),
 
 

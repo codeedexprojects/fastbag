@@ -37,7 +37,14 @@ class ClothingListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [VendorJWTAuthentication]
     filter_backends = [SearchFilter]
-    search_fields = ['name']  
+    search_fields = ['name']
+
+    def get_queryset(self):
+        vendor = self.request.user 
+        return Clothing.objects.filter(vendor=vendor)
+
+    def perform_create(self, serializer):
+        serializer.save(vendor=self.request.user)
 
 class ClothingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Clothing.objects.all()
@@ -79,12 +86,56 @@ class ClothingDetailViewUser(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = []
     parser_classes = [MultiPartParser, FormParser]
 
+from geopy.distance import geodesic
+
 class OfferProductsViewfashion(generics.ListAPIView):
     serializer_class = ClothingSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        return Clothing.objects.filter(is_offer_product=True, is_active=True, is_available=True)
+        latitude = self.request.query_params.get("latitude")
+        longitude = self.request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Clothing.objects.none()
+
+        user_location = (float(latitude), float(longitude))
+        nearby_vendors = []
+
+        for vendor in Vendor.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True):
+            vendor_location = (float(vendor.latitude), float(vendor.longitude))
+            distance_km = geodesic(user_location, vendor_location).km
+            if distance_km <= 20:  # within 20 km
+                nearby_vendors.append(vendor.id)
+
+        return Clothing.objects.filter(
+            vendor_id__in=nearby_vendors,
+            is_offer_product=True,
+            is_active=True,
+            is_available=True
+        )
+
+    def list(self, request, *args, **kwargs):
+        latitude = request.query_params.get("latitude")
+        longitude = request.query_params.get("longitude")
+
+        if not latitude or not longitude:
+            return Response(
+                {"error": "Latitude and longitude are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)  
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        # Fallback: no pagination
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class ClothingImageListCreateViewVendor(generics.ListCreateAPIView):
     queryset = ClothingImage.objects.all()

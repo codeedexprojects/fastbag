@@ -190,12 +190,12 @@ class AppCarouselByLocation(models.Model):
     longitude = models.FloatField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
 
+from django.core.files import File
+from .utils import compress_video
+import os
+
 class VendorVideo(models.Model):
-    vendor = models.ForeignKey(
-        Vendor, 
-        on_delete=models.CASCADE, 
-        related_name="videos"
-    )
+    vendor = models.ForeignKey("Vendor", on_delete=models.CASCADE, related_name="videos")
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     video = models.FileField(upload_to="vendor_videos/")  
@@ -206,5 +206,46 @@ class VendorVideo(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.video and not self.video.name.endswith("_compressed.mp4"):
+            input_path = self.video.path
+            output_path = input_path.replace(".mp4", "_compressed.mp4")
+
+            compress_video(input_path, output_path)
+
+            self.video.save(
+                os.path.basename(output_path),
+                File(open(output_path, "rb")),
+                save=False
+            )
+            super().save(update_fields=["video"])
+
+    
+from decimal import Decimal
+class VendorCommission(models.Model):
+    PAYMENT_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("paid", "Paid")
+    ]
+
+    vendor = models.ForeignKey("Vendor", on_delete=models.CASCADE, related_name="commissions")
+    total_sales = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default="pending"
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at"]
+
     def __str__(self):
-        return f"{self.vendor.business_name} - {self.title or 'Video'}"
+        return (
+            f"{self.vendor.business_name} - {self.commission_amount} "
+            f"({self.created_at.date()}) - {self.payment_status}"
+        )

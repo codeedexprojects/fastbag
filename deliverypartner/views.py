@@ -1,4 +1,3 @@
-from rest_framework import generics
 from .models import DeliveryBoy
 from .serializers import *
 from rest_framework.permissions import IsAuthenticated
@@ -6,15 +5,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 import random
 from django.conf import settings
-from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status
 from rest_framework.response import Response
 from vendors.authentication import VendorJWTAuthentication
 from rest_framework.views import APIView
 from users.utils import send_otp_2factor
-
-
+from django.utils import timezone
+from rest_framework import generics, status
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from deliverypartner.models import OrderAssign, DeliveryBoy
+from cart.models import Order
 class DeliveryBoyListCreateView(generics.ListCreateAPIView):
     queryset = DeliveryBoy.objects.all()
     serializer_class = DeliveryBoySerializer
@@ -179,29 +181,43 @@ class MarkNotificationAsReadView(generics.UpdateAPIView):
         except DeliveryNotification.DoesNotExist:
             return Response({'error': 'Notification not found'}, status=status.HTTP_404_NOT_FOUND)
 
-from django.shortcuts import get_object_or_404
+
 class AcceptOrderView(generics.UpdateAPIView):
+    authentication_classes = []
+    permission_classes = []
+
     def update(self, request, *args, **kwargs):
         order_id = kwargs.get('order_id')
         delivery_boy_id = kwargs.get('delivery_boy_id')
 
-        try:
-            order_assignment = OrderAssign.objects.get(order__id=order_id, delivery_boy_id=delivery_boy_id)
-        except OrderAssign.DoesNotExist:
-            return Response({"detail": "No OrderAssign matches the given query."}, status=status.HTTP_404_NOT_FOUND)
 
-        if OrderAssign.objects.filter(order__id=order_id, is_accepted=True).exists():
-            return Response({"detail": "This order has already been accepted by another delivery boy."}, status=status.HTTP_400_BAD_REQUEST)
+        order = get_object_or_404(Order, id=order_id)
 
-        order_assignment.is_accepted = True
-        order_assignment.accepted_by_id = delivery_boy_id
-        order_assignment.status = 'PICKED'
-        order_assignment.save()
 
-        delivery_boy = DeliveryBoy.objects.get(id=delivery_boy_id)
+        if OrderAssign.objects.filter(order=order, is_accepted=True).exists():
+            return Response({"detail": "This order has already been accepted by another delivery boy."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+        delivery_boy = get_object_or_404(DeliveryBoy, id=delivery_boy_id)
+
+
+        order.order_status = 'Picked'
+        order.save()
+
+
+        order_assign = OrderAssign.objects.create(
+            order=order,
+            delivery_boy=delivery_boy,
+            is_accepted=True,
+            accepted_by=delivery_boy,
+            status='PICKED',
+            assigned_at=timezone.now()
+        )
 
         return Response({
             "message": "Order accepted successfully.",
+            "order_id": order.id,
             "delivery_boy_id": delivery_boy.id,
             "delivery_boy_name": delivery_boy.name
         }, status=status.HTTP_200_OK)
@@ -277,39 +293,62 @@ class AcceptedOrderListView(generics.ListAPIView):
             accepted_by_id=delivery_boy_id
         ).select_related('order', 'accepted_by', 'order__checkout', 'order__user')
     
+class RejecteddOrderListView(generics.ListAPIView):
+    serializer_class = AcceptedOrderSerializer 
+    permission_classes = []
+
+    def get_queryset(self):
+        delivery_boy_id = self.kwargs.get('delivery_boy_id')
+        return OrderAssign.objects.filter(
+            is_rejected=True,
+            delivery_boy_id=delivery_boy_id
+        ).select_related('order', 'delivery_boy', 'order__checkout', 'order__user')
+
 
 class RejectOrderView(generics.UpdateAPIView):
     permission_classes = []
+
     def update(self, request, *args, **kwargs):
         order_id = kwargs.get('order_id')
         delivery_boy_id = kwargs.get('delivery_boy_id')
 
-        try:
-            order_assignment = OrderAssign.objects.get(order__id=order_id, delivery_boy_id=delivery_boy_id)
-        except OrderAssign.DoesNotExist:
-            return Response(
-                {"detail": "No OrderAssign matches the given query."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        if order_assignment.is_rejected:
-            return Response(
-                {"detail": "This order is already marked as rejected by this delivery boy."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if order_assignment.is_accepted:
-            return Response(
-                {"detail": "This order is already accepted and cannot be rejected."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        order_assignment.is_rejected = True
-        order_assignment.status = 'REJECTED'
-        order_assignment.save()
+        order = get_object_or_404(Order, id=order_id)
+        delivery_boy = get_object_or_404(DeliveryBoy, id=delivery_boy_id)
 
-        delivery_boy = order_assignment.delivery_boy
+        order_assignment = (
+            OrderAssign.objects.filter(order=order, delivery_boy=delivery_boy)
+            .order_by('-assigned_at')
+            .first()
+        )
+
+        if not order_assignment:
+            order_assignment = OrderAssign.objects.create(
+                order=order,
+                delivery_boy=delivery_boy,
+                assigned_at=timezone.now(),
+                status='REJECTED',
+                is_rejected=True
+            )
+        else:
+            if order_assignment.is_accepted:
+                return Response(
+                    {"detail": "This order is already accepted and cannot be rejected."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if order_assignment.is_rejected:
+                return Response(
+                    {"detail": "This order is already marked as rejected by this delivery boy."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            order_assignment.is_rejected = True
+            order_assignment.status = 'REJECTED'
+            order_assignment.save()
 
         return Response({
             "message": "Order rejected successfully.",
-            "order_id": order_assignment.order.id,
+            "order_id": order.id,
             "delivery_boy_id": delivery_boy.id,
             "delivery_boy_name": delivery_boy.name,
             "status": order_assignment.status

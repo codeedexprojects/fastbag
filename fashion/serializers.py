@@ -191,9 +191,10 @@ class ClothingSerializer(serializers.ModelSerializer):
     def get_is_wishlisted(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return FashionWishlist.objects.filter(user=request.user, cloth=obj).exists()
+            from users.models import CustomUser  
+            if isinstance(request.user, CustomUser):
+                return FashionWishlist.objects.filter(user=request.user, cloth=obj).exists()
         return False
-
 
 class ClothingSerializeruser(serializers.ModelSerializer):
     category = serializers.StringRelatedField(read_only=True)

@@ -19,7 +19,9 @@ from datetime import timedelta
 from rest_framework import generics, status
 from rest_framework.response import Response
 from django.utils.dateparse import parse_date
-
+from collections import defaultdict
+from decimal import Decimal
+from rest_framework.permissions import AllowAny
 class CartDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -699,15 +701,13 @@ class VendorOrderUpdateDetailView(APIView):
                     item.status = status_value
                     updated = True
 
-                # Update quantity if present
                 if "quantity" in item_data:
                     try:
                         qty = int(item_data["quantity"])
                         if qty < 1:
                             raise ValueError()
                         item.quantity = qty
-                        # You may want to update subtotal here as well
-                        item.subtotal = qty * item.product.price  # Adjust based on your pricing model
+                        item.subtotal = qty * item.product.price  
                         updated = True
                     except ValueError:
                         return Response({"error": f"Invalid quantity for item {item.id}"}, status=400)
@@ -723,9 +723,6 @@ class VendorOrderUpdateDetailView(APIView):
 
 
 
-from collections import defaultdict
-from decimal import Decimal
-from rest_framework.permissions import AllowAny
 
 class GroupedCartView(APIView):
     permission_classes = [IsAuthenticated]
@@ -748,6 +745,7 @@ class GroupedCartView(APIView):
                 grouped_data[vendor_id] = {
                     "vendor_id": item.vendor.id,
                     "vendor_name": item.vendor.business_name,
+                    "store_type" : item.product_type,
                     "vendor_logo": request.build_absolute_uri(item.vendor.store_logo.url) if item.vendor.store_logo else None,
                     "vendor_image": request.build_absolute_uri(item.vendor.display_image.url) if item.vendor.display_image else None,
                     "items": []
@@ -1265,7 +1263,7 @@ class OrderItemsByOrderIDView(APIView):
                     product_type = 'fashion'
                     fashion_ids.append(item.product_id)
                 else:
-                    product_type = raw_type  # fallback
+                    product_type = raw_type  
                 normalized_types[item.id] = product_type
 
             # Bulk fetch products

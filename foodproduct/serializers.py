@@ -60,6 +60,8 @@ class DishCreateSerializer(serializers.ModelSerializer):
     images = serializers.SerializerMethodField()
     store_type = serializers.CharField(source='vendor.store_type.name', read_only=True)
     is_wishlisted = serializers.SerializerMethodField()
+    
+    vendor = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Dish
@@ -78,12 +80,10 @@ class DishCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         image_files = validated_data.pop('image_files', [])
-        # Update other dish fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Optionally delete old images before adding new ones
         if image_files:
             instance.images.all().delete()
             for image in image_files:
@@ -98,7 +98,12 @@ class DishCreateSerializer(serializers.ModelSerializer):
     def get_is_wishlisted(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return Wishlist.objects.filter(user=request.user, dish=obj).exists()
+            try:
+                from users.models import CustomUser  
+                if isinstance(request.user, CustomUser):
+                    return Wishlist.objects.filter(user=request.user, dish=obj).exists()
+            except (ValueError, TypeError):
+                pass
         return False
     
 class Dishlistserializer(serializers.ModelSerializer):
